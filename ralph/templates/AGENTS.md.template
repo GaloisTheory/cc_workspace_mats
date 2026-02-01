@@ -1,0 +1,34 @@
+# AGENTS.md - Operational Guide
+
+> **Template:** Customize this file for your project. Remove this notice when done.
+
+## Build & Run
+
+```bash
+# Install dependencies
+pip install -e ".[dev]"  # or: pip install -r requirements.txt
+```
+
+## Validation
+
+Run these after implementing to verify your work:
+
+```bash
+# Tests
+pytest
+
+# Type checking
+mypy src/  # or: pyright
+
+# Linting
+ruff check .
+ruff format --check .
+```
+
+## Operational Notes
+
+<!-- Ralph will add patterns discovered during implementation here -->
+
+## Codebase Patterns
+
+<!-- Ralph will add codebase-specific patterns here -->
