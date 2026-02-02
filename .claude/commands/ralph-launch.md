@@ -2,27 +2,47 @@
 
 Verify everything is ready before running Ralph in a separate terminal.
 
+## Usage
+
+`/ralph-launch` - Run in current directory
+`/ralph-launch <path>` - Run in specified project directory (e.g., `/ralph-launch projects/my-project`)
+
+$ARGUMENTS
+
+**Target directory:** If `$ARGUMENTS` is provided, all operations target that directory.
+Verify the directory exists before proceeding.
+
 ## Instructions
 
 Run through this checklist to ensure Ralph can run successfully.
 Report issues clearly and provide the exact command to run.
 
+### 0. Determine Target Directory
+
+If `$ARGUMENTS` is provided:
+1. Verify the directory exists
+2. Use this as the target directory for all subsequent operations
+
+If `$ARGUMENTS` is empty, use the current working directory.
+
+All file paths below are relative to the **target directory**.
+
 ### Checklist Items
 
 #### 1. Specs Directory
 
-Check that `specs/` exists and contains spec files:
+Check that `<target-directory>/specs/` exists and contains spec files:
 
 ```bash
-ls -la specs/
+ls -la <target-directory>/specs/
 ```
 
 **Pass**: Directory exists with `.md` files
-**Fail**: Directory missing or empty → Run `/ralph-specs` first
+**Fail**: Directory missing or empty → Run `/ralph-specs <target-directory>` first
 
 #### 2. AGENTS.md Validation Commands
 
-Read `AGENTS.md` and verify it has ACTUAL validation commands, not just template placeholders.
+Read `<target-directory>/AGENTS.md` and verify it has ACTUAL validation commands, not just template placeholders.
 
 **Check for**:
 - Real pytest command (not just `# pytest`)
@@ -30,15 +50,15 @@ Read `AGENTS.md` and verify it has ACTUAL validation commands, not just template
 - Real linter command (ruff/flake8)
 
 **Pass**: Has concrete, runnable validation commands
-**Fail**: Still has template placeholders → Edit `AGENTS.md` with your project's commands
+**Fail**: Still has template placeholders → Edit `<target-directory>/AGENTS.md` with your project's commands
 
 #### 3. Implementation Plan (for build mode)
 
-If user wants to run `ralph build`, check `IMPLEMENTATION_PLAN.md`:
+If user wants to run `ralph build`, check `<target-directory>/IMPLEMENTATION_PLAN.md`:
 
 ```bash
 # Check if file exists and has tasks
-grep -c "^\- \[ \]" IMPLEMENTATION_PLAN.md 2>/dev/null || echo "0"
+grep -c "^\- \[ \]" <target-directory>/IMPLEMENTATION_PLAN.md 2>/dev/null || echo "0"
 ```
 
 **Pass**: File exists with incomplete tasks (`[ ]`)
@@ -46,10 +66,10 @@ grep -c "^\- \[ \]" IMPLEMENTATION_PLAN.md 2>/dev/null || echo "0"
 
 #### 4. Git Working Tree
 
-Check for uncommitted changes:
+Check for uncommitted changes in the target directory:
 
 ```bash
-git status --porcelain
+git -C <target-directory> status --porcelain
 ```
 
 **Pass**: Working tree is clean (empty output)
@@ -60,7 +80,7 @@ git status --porcelain
 Verify we can push to origin:
 
 ```bash
-git remote -v | grep origin
+git -C <target-directory> remote -v | grep origin
 ```
 
 **Pass**: Origin remote configured
@@ -85,10 +105,12 @@ After running all checks, output a clear summary:
   All checks passed! Run in a separate terminal:
 ═══════════════════════════════════════════════════════════
 
+  cd <target-directory>
   ralph plan          # Generate implementation plan from specs
 
   # OR if plan already exists:
 
+  cd <target-directory>
   ralph build --max 30   # Start building (30 iterations max)
 
 ```
@@ -119,9 +141,9 @@ Show what failed and how to fix:
 
 Determine which mode the user likely wants:
 
-- **No IMPLEMENTATION_PLAN.md or only template content** → Suggest `ralph plan`
-- **IMPLEMENTATION_PLAN.md has incomplete tasks** → Suggest `ralph build`
-- **All tasks complete** → Suggest reviewing with `/ralph-review`
+- **No IMPLEMENTATION_PLAN.md or only template content** → Suggest `cd <target-directory> && ralph plan`
+- **IMPLEMENTATION_PLAN.md has incomplete tasks** → Suggest `cd <target-directory> && ralph build`
+- **All tasks complete** → Suggest reviewing with `/ralph-review <target-directory>`
 
 ### Important Reminders
 

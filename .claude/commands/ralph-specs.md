@@ -2,10 +2,30 @@
 
 Phase 1 of the Ralph workflow: Define what to build through conversation.
 
+## Usage
+
+`/ralph-specs` - Run in current directory
+`/ralph-specs <path>` - Run in specified project directory (e.g., `/ralph-specs projects/my-project`)
+
+$ARGUMENTS
+
+**Target directory:** If `$ARGUMENTS` is provided, all operations target that directory.
+Verify the directory exists before proceeding.
+
 ## Instructions
 
 You are helping the user define specifications for their project. This is an
 interactive conversation - ask questions, understand deeply, then generate specs.
+
+### 0. Determine Target Directory
+
+If `$ARGUMENTS` is provided:
+1. Verify the directory exists
+2. Use this as the target directory for all subsequent operations
+
+If `$ARGUMENTS` is empty, use the current working directory.
+
+All file paths below (especially `specs/`) are relative to the **target directory**.
 
 ### Phase 1: Understand the Job To Be Done (JTBD)
 
@@ -47,7 +67,7 @@ Example decomposition for "build a CLI tool that fetches and caches API data":
 
 ### Phase 4: Generate Spec Files
 
-For each topic, create `specs/<topic-name>.md` with this structure:
+For each topic, create `<target-directory>/specs/<topic-name>.md` with this structure:
 
 ```markdown
 # <Topic Name>
@@ -101,9 +121,9 @@ After generating all specs, provide:
 2. **Next steps**:
    ```
    Specs generated! Next:
-   1. Review the specs in specs/ and refine if needed
-   2. Run /ralph-launch to verify everything is ready
-   3. Run 'ralph plan' in a separate terminal to generate the implementation plan
+   1. Review the specs in <target-directory>/specs/ and refine if needed
+   2. Run /ralph-launch <target-directory> to verify everything is ready
+   3. Run 'ralph plan' in a separate terminal (from target directory) to generate the implementation plan
    ```
 
 3. **Ask**: "Want to review or refine any of these specs before proceeding?"

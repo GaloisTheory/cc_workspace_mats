@@ -2,15 +2,36 @@
 
 Initialize Ralph Wiggum autonomous coding system in this project directory.
 
+## Usage
+
+`/ralph-init` - Run in current directory
+`/ralph-init <path>` - Run in specified project directory (e.g., `/ralph-init projects/my-project`)
+
+$ARGUMENTS
+
+**Target directory:** If `$ARGUMENTS` is provided, all operations target that directory.
+Verify the directory exists before proceeding. If it doesn't exist, ask the user if they want to create it.
+
 ## Instructions
 
 You are setting up Ralph for this project. Follow these steps:
 
+### 0. Determine Target Directory
+
+If `$ARGUMENTS` is provided:
+1. Check if the directory exists
+2. If not, ask user if they want to create it
+3. Use this as the target directory for all subsequent operations
+
+If `$ARGUMENTS` is empty, use the current working directory.
+
+All file paths below are relative to the **target directory**.
+
 ### 1. Verify Git Repository
 
-Check if we're in a git repository:
+Check if the target directory is in a git repository:
 ```bash
-git rev-parse --show-toplevel
+git -C <target-directory> rev-parse --show-toplevel
 ```
 
 If not a git repo, warn the user and ask if they want to initialize one.
@@ -26,18 +47,18 @@ If templates not found, inform the user and provide manual setup instructions.
 
 ### 3. Create Directory Structure
 
-Create these directories if they don't exist:
-- `specs/` - For specification files
+Create these directories in the target directory if they don't exist:
+- `<target-directory>/specs/` - For specification files
 
 ### 4. Copy/Create Files
 
-For each file, check if it exists first. **Never overwrite existing files** - warn and skip instead.
+For each file in the target directory, check if it exists first. **Never overwrite existing files** - warn and skip instead.
 
-**AGENTS.md** (from template):
-- Copy from `templates/AGENTS.md.template`
+**<target-directory>/AGENTS.md** (from template):
+- Copy from `templates/AGENTS.md.template` to `<target-directory>/AGENTS.md`
 - Tell user to customize validation commands for their project
 
-**IMPLEMENTATION_PLAN.md** (create empty):
+**<target-directory>/IMPLEMENTATION_PLAN.md** (create empty):
 ```markdown
 # Implementation Plan
 
@@ -54,7 +75,7 @@ For each file, check if it exists first. **Never overwrite existing files** - wa
 
 ### 5. Update .gitignore (if needed)
 
-Check `.gitignore` and add these entries if not present:
+Check `<target-directory>/.gitignore` and add these entries if not present:
 ```
 # Ralph working files (optional - some prefer to track these)
 # IMPLEMENTATION_PLAN.md
@@ -68,8 +89,8 @@ After setup, print:
 - What was created vs skipped
 - Next steps:
   1. Edit `AGENTS.md` with your project's validation commands
-  2. Run `/ralph-specs` to generate specifications
-  3. Run `ralph plan` (in separate terminal) to generate implementation plan
+  2. Run `/ralph-specs <target-directory>` to generate specifications
+  3. Run `ralph plan` (in separate terminal, from target directory) to generate implementation plan
   4. Run `ralph build` (in separate terminal) to start building
 
 ### Important Notes

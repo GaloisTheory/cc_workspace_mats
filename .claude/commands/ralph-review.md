@@ -2,46 +2,66 @@
 
 Review what Ralph accomplished during a build session.
 
+## Usage
+
+`/ralph-review` - Run in current directory
+`/ralph-review <path>` - Run in specified project directory (e.g., `/ralph-review projects/my-project`)
+
+$ARGUMENTS
+
+**Target directory:** If `$ARGUMENTS` is provided, all operations target that directory.
+Verify the directory exists before proceeding.
+
 ## Instructions
 
 You are reviewing Ralph's work after a `ralph build` or `ralph plan-work` session.
 Provide a clear summary of what was done and what remains.
 
+### 0. Determine Target Directory
+
+If `$ARGUMENTS` is provided:
+1. Verify the directory exists
+2. Use this as the target directory for all subsequent operations
+
+If `$ARGUMENTS` is empty, use the current working directory.
+
+All file paths and git commands below operate in/on the **target directory**.
+
 ### 1. Identify the Ralph Branch
 
-Find the current or most recent Ralph branch:
+Find the current or most recent Ralph branch in the target directory:
 
 ```bash
 # Check current branch
-git branch --show-current
+git -C <target-directory> branch --show-current
 
 # Or find ralph/* branches
-git branch -a | grep ralph/
+git -C <target-directory> branch -a | grep ralph/
 ```
 
 If not on a ralph/* branch, ask the user which branch to review or check for worktrees:
 ```bash
-git worktree list
+git -C <target-directory> worktree list
 ```
 
 ### 2. Show Branch Diff Summary
 
-Show what changed compared to main:
+Show what changed compared to main in the target directory:
 
 ```bash
 # Get the base branch
-git merge-base main HEAD
+git -C <target-directory> merge-base main HEAD
 
 # Summary of changes
-git diff main...HEAD --stat
+git -C <target-directory> diff main...HEAD --stat
 
 # Number of commits
-git rev-list main..HEAD --count
+git -C <target-directory> rev-list main..HEAD --count
 ```
 
 ### 3. Summarize Completed Work
 
-Read `IMPLEMENTATION_PLAN.md` and extract:
+Read `<target-directory>/IMPLEMENTATION_PLAN.md` and extract:
 
 **Completed Tasks** (marked `[x]}):
 - List each completed task with a one-line summary
@@ -55,26 +75,26 @@ Read `IMPLEMENTATION_PLAN.md` and extract:
 
 ### 4. Show Recent Commits
 
-Display the commit history for this branch:
+Display the commit history for this branch in the target directory:
 
 ```bash
-git log main..HEAD --oneline --no-decorate
+git -C <target-directory> log main..HEAD --oneline --no-decorate
 ```
 
 For more detail on what changed:
 ```bash
-git log main..HEAD --format="%h %s" --stat --no-decorate | head -50
+git -C <target-directory> log main..HEAD --format="%h %s" --stat --no-decorate | head -50
 ```
 
 ### 5. Check Validation Status
 
-If possible, run the validation commands from `AGENTS.md`:
+If possible, run the validation commands from `<target-directory>/AGENTS.md` (run from the target directory):
 
 ```bash
-# Quick check - do tests pass?
-pytest --co -q  # Just collect, don't run
-ruff check . --statistics
-mypy src/ --no-error-summary 2>&1 | tail -5
+# Quick check - do tests pass? (run from target directory)
+cd <target-directory> && pytest --co -q  # Just collect, don't run
+cd <target-directory> && ruff check . --statistics
+cd <target-directory> && mypy src/ --no-error-summary 2>&1 | tail -5
 ```
 
 Report any obvious issues.
@@ -87,7 +107,8 @@ Based on the review, suggest one of:
 ```
 ✅ All tasks completed! Ready to merge.
 
-Suggested commands:
+Suggested commands (run from target directory):
+  cd <target-directory>
   git checkout main
   git merge ralph/branch-name
   git push
