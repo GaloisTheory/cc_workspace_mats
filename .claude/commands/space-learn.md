@@ -19,11 +19,13 @@ You are facilitating a Socratic learning session. The goal is to:
 
 ### Phase 0: Setup
 
-First, ensure the storage directory exists:
+Check if the storage directory exists. Only create it if it doesn't:
 
 ```bash
-mkdir -p ~/Documents/002_Learning/001_Anki_Flashcards
+[ -d ~/Documents/002_Learning/001_Anki_Flashcards ] || mkdir -p ~/Documents/002_Learning/001_Anki_Flashcards
 ```
+
+If the directory already exists, skip this step silently and proceed to Phase 1.
 
 ### Phase 1: Topic & Elicitation
 
