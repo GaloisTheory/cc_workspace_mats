@@ -18,7 +18,7 @@ PROMPTS_DIR="$SCRIPT_PATH/prompts"
 TEMPLATES_DIR="$SCRIPT_PATH/templates"
 
 # Defaults
-DEFAULT_MODEL="claude-opus-4-5-20250514"
+DEFAULT_MODEL="claude-opus-4-5"
 DEFAULT_PLAN_MAX=5
 DEFAULT_BUILD_MAX=50
 DEFAULT_PLANWORK_MAX=10
@@ -45,6 +45,7 @@ Ralph - Autonomous Coding Loop
 
 USAGE:
     ralph.sh <command> [options]
+    ralph.sh -C <project-path> <command> [options]
 
 COMMANDS:
     init                    Set up Ralph files in current project
@@ -55,6 +56,8 @@ COMMANDS:
     cleanup                 Remove merged worktree branches
 
 OPTIONS:
+    -C <path>           Run in specified project directory
+    --project <path>    Same as -C
     --model <model>     Model to use (default: claude-opus-4-5-20250514)
     --max <N>           Maximum iterations (default: 5 for plan, 50 for build)
     --no-worktree       Skip worktree creation, work on current branch
@@ -68,6 +71,7 @@ EXAMPLES:
     ralph.sh plan-work "add auth" --max 20
     ralph.sh status                      # Check current state
     ralph.sh cleanup                     # Clean up merged branches
+    ralph.sh -C projects/myapp build     # Build in a subdirectory project
 
 ENVIRONMENT:
     RALPH_WORKSPACE     Path to workspace containing ralph/ directory
@@ -542,6 +546,7 @@ main() {
     local model="$DEFAULT_MODEL"
     local use_worktree="true"
     local auto_resume="false"
+    local project_dir=""
     local positional_args=()
 
     # Parse arguments
@@ -549,6 +554,10 @@ main() {
         case "$1" in
             --help|-h)
                 usage
+                ;;
+            -C|--project)
+                project_dir="$2"
+                shift 2
                 ;;
             --model)
                 model="$2"
@@ -577,6 +586,16 @@ main() {
                 ;;
         esac
     done
+
+    # Change to project directory if specified
+    if [[ -n "$project_dir" ]]; then
+        if [[ ! -d "$project_dir" ]]; then
+            log_error "Project directory does not exist: $project_dir"
+            exit 1
+        fi
+        log_info "Changing to project directory: $project_dir"
+        cd "$project_dir"
+    fi
 
     # Extract command and arguments from positional args
     if [[ ${#positional_args[@]} -gt 0 ]]; then
