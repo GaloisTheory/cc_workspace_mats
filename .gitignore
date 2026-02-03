@@ -1,2 +1,5 @@
-projects/
 .claude/settings.local.json
+
+# Keep projects folder but ignore all its contents except .gitkeep
+projects/*
+!projects/.gitkeep
