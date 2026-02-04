@@ -51,3 +51,38 @@ in headless mode, with fresh context each iteration.
 - `AGENTS.md` captures operational learnings
 - Plan is disposable — regenerate when specs change or approach is wrong
 - Slash commands run interactively; `ralph.sh` runs in a separate terminal
+
+## Claude Code Notifications
+
+This workspace has hooks configured to send push notifications when Claude needs input (permission prompts, idle state).
+
+### Setup (one-time per machine)
+
+1. **Install jq** (if not installed):
+   ```bash
+   apt-get install -y jq  # Linux
+   brew install jq        # macOS
+   ```
+
+2. **Subscribe to notifications** at: `https://ntfy.sh/claude-code-notify-abc123`
+   - Open in browser, or install ntfy app on phone
+
+3. **Add to your shell profile** (`~/.bashrc` or `~/.zshrc`):
+   ```bash
+   export CLAUDE_NTFY_TOPIC="claude-code-notify-abc123"
+   ```
+
+### Per-terminal tab naming (optional)
+
+Set a custom name for each terminal to identify which tab needs attention:
+```bash
+export CLAUDE_TAB_NAME="my-task-name"
+```
+
+Notifications will show: `[my-task-name]: Claude needs your attention`
+
+### How it works
+
+- Hook config: `.claude/settings.json`
+- Hook script: `.claude/hooks/notify-input-needed.sh`
+- Triggers on: `permission_prompt`, `idle_prompt` events

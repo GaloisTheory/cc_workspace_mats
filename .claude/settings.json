@@ -58,5 +58,19 @@
         "Read(**/.env.*)",
         "Read(**/secrets/**)"
       ]
+    },
+    "hooks": {
+      "Notification": [
+        {
+          "matcher": "permission_prompt|idle_prompt",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "/workspace/001_Projects/002_mini_projects/.claude/hooks/notify-input-needed.sh",
+              "timeout": 5
+            }
+          ]
+        }
+      ]
     }
   }
