@@ -1,5 +1,5 @@
 .claude/settings.local.json
-
+.venv 
 # Keep projects folder but ignore all its contents except .gitkeep
 projects/*
 !projects/.gitkeep
