@@ -60,9 +60,8 @@
       ]
     },
     "hooks": {
-      "Notification": [
+      "Stop": [
         {
-          "matcher": "permission_prompt|idle_prompt",
           "hooks": [
             {
               "type": "command",
