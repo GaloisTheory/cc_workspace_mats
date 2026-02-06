@@ -86,3 +86,41 @@ Notifications will show: `[my-task-name]: Claude needs your attention`
 - Hook config: `.claude/settings.json`
 - Hook script: `.claude/hooks/notify-input-needed.sh`
 - Triggers on: `permission_prompt`, `idle_prompt` events
+
+## Environment Health Check (GPU Box)
+
+**On every new conversation**, if this looks like a GPU workspace (i.e. `/workspace` exists), verify the following environment variables are exported and available to child processes. If any are missing, alert the user and offer to fix them.
+
+### Required Environment Variables
+
+| Variable | Expected Value | Source |
+|----------|---------------|--------|
+| `HF_HOME` | `/workspace/.cache/huggingface` | Prevents re-downloading models (~55GB for gemma-3-27b) |
+| `HUGGINGFACE_HUB_CACHE` | `/workspace/.cache/huggingface` | Same as above (legacy compat) |
+| `TRANSFORMERS_CACHE` | `/workspace/.cache/huggingface` | Same as above (legacy compat) |
+| `OPENROUTER_API_KEY` | from `/workspace/.secrets` | API access |
+| `HF_TOKEN` | from `/workspace/.secrets` | Gated model downloads |
+| `GITHUB_TOKEN` | from `/workspace/.secrets` | Git push access |
+
+### How to Fix
+
+If variables are missing, it means `startup.sh` was run as a script (subshell) rather than sourced, or the bashrc block is missing. Fix with:
+
+```bash
+# Immediate fix for current shell
+set -a && source /workspace/.secrets && set +a
+export HF_HOME=/workspace/.cache/huggingface
+export HUGGINGFACE_HUB_CACHE=/workspace/.cache/huggingface
+export TRANSFORMERS_CACHE=/workspace/.cache/huggingface
+```
+
+### Key Files
+
+- `/workspace/.secrets` — API keys (GITHUB_TOKEN, HF_TOKEN, OPENROUTER_API_KEY)
+- `/workspace/startup.sh` — Run once per machine boot; persists env to `~/.bashrc`
+
+### Learnings
+
+- `startup.sh` runs in a **subshell** — its `export`s don't propagate to interactive terminals. The fix is to also write the exports into `~/.bashrc`.
+- `source /workspace/.secrets` alone doesn't export — use `set -a` / `set +a` around it.
+- Without `HF_HOME` set, HuggingFace downloads models to `~/.cache/` (ephemeral storage) instead of `/workspace/.cache/` (persistent), causing multi-GB re-downloads on every restart.
