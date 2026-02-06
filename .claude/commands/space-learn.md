@@ -19,13 +19,17 @@ You are facilitating a Socratic learning session. The goal is to:
 
 ### Phase 0: Setup
 
-Check if the storage directory exists. Only create it if it doesn't:
+First, ask the user: **"Are you on a remote GPU, or running locally?"**
 
-```bash
-[ -d ~/Documents/002_Learning/001_Anki_Flashcards ] || mkdir -p ~/Documents/002_Learning/001_Anki_Flashcards
-```
+- **Local:** Check if the storage directory exists. Only create it if it doesn't:
+  ```bash
+  [ -d ~/Documents/002_Learning/001_Anki_Flashcards ] || mkdir -p ~/Documents/002_Learning/001_Anki_Flashcards
+  ```
+  If the directory already exists, skip this step silently. Save path: `~/Documents/002_Learning/001_Anki_Flashcards/`
 
-If the directory already exists, skip this step silently and proceed to Phase 1.
+- **Remote GPU:** Skip directory creation entirely. Flashcards will be saved as a `.tsv` file in the current working directory. Save path: `./`
+
+Remember which mode was selected for Phase 5.
 
 ### Phase 1: Topic & Elicitation
 
@@ -100,12 +104,16 @@ Would you like to:
 
 ### Phase 5: Save to TSV
 
-Once the user confirms, save to `~/Documents/002_Learning/001_Anki_Flashcards/<topic>-<timestamp>.tsv`
+Once the user confirms, save to the path determined in Phase 0:
+
+- **Local:** `~/Documents/002_Learning/001_Anki_Flashcards/<topic>-<timestamp>.tsv`
+- **Remote GPU:** `./<topic>-<timestamp>.tsv` (current working directory)
 
 **Filename format:**
 - Sanitize topic: lowercase, replace spaces with hyphens, remove special chars
 - Timestamp: YYYY-MM-DD-HHMM
-- Example: `~/Documents/002_Learning/001_Anki_Flashcards/sparse-autoencoders-2025-02-03-1430.tsv`
+- Example (local): `~/Documents/002_Learning/001_Anki_Flashcards/sparse-autoencoders-2025-02-03-1430.tsv`
+- Example (remote): `./sparse-autoencoders-2025-02-03-1430.tsv`
 
 **TSV format:**
 ```
