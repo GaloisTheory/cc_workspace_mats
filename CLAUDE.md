@@ -54,7 +54,7 @@ in headless mode, with fresh context each iteration.
 
 ## Claude Code Notifications
 
-This workspace has hooks configured to send push notifications when Claude needs input (permission prompts, idle state).
+This workspace has hooks configured to send push notifications when Claude finishes a response (Stop hook).
 
 ### Setup (one-time per machine)
 
@@ -64,13 +64,10 @@ This workspace has hooks configured to send push notifications when Claude needs
    brew install jq        # macOS
    ```
 
-2. **Subscribe to notifications** at: `https://ntfy.sh/claude-code-notify-abc123`
+2. **Subscribe to notifications** at: `https://ntfy.sh/claude-dohun-7d57c012`
    - Open in browser, or install ntfy app on phone
 
-3. **Add to your shell profile** (`~/.bashrc` or `~/.zshrc`):
-   ```bash
-   export CLAUDE_NTFY_TOPIC="claude-code-notify-abc123"
-   ```
+3. **`CLAUDE_NTFY_TOPIC`** is set automatically by `startup.sh` and persisted to `~/.bashrc`.
 
 ### Per-terminal tab naming (optional)
 
@@ -85,7 +82,7 @@ Notifications will show: `[my-task-name]: Claude needs your attention`
 
 - Hook config: `.claude/settings.json`
 - Hook script: `.claude/hooks/notify-input-needed.sh`
-- Triggers on: `permission_prompt`, `idle_prompt` events
+- Hook type: `Stop` (fires when Claude finishes responding and needs input)
 
 ## Environment Health Check (GPU Box)
 
@@ -101,6 +98,7 @@ Notifications will show: `[my-task-name]: Claude needs your attention`
 | `OPENROUTER_API_KEY` | from `/workspace/.secrets` | API access |
 | `HF_TOKEN` | from `/workspace/.secrets` | Gated model downloads |
 | `GITHUB_TOKEN` | from `/workspace/.secrets` | Git push access |
+| `CLAUDE_NTFY_TOPIC` | `claude-dohun-7d57c012` | Push notifications via ntfy.sh |
 
 ### How to Fix
 
@@ -112,6 +110,7 @@ set -a && source /workspace/.secrets && set +a
 export HF_HOME=/workspace/.cache/huggingface
 export HUGGINGFACE_HUB_CACHE=/workspace/.cache/huggingface
 export TRANSFORMERS_CACHE=/workspace/.cache/huggingface
+export CLAUDE_NTFY_TOPIC="claude-dohun-7d57c012"
 ```
 
 ### Key Files
