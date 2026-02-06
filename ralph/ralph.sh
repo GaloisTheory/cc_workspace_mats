@@ -5,9 +5,9 @@ set -euo pipefail
 # Ralph - Autonomous Coding Loop
 #===============================================================================
 # External bash loop that runs Claude Code headlessly. Each iteration gets a
-# fresh context window - this is the core advantage over plugin approaches.
+# fresh context window. Two-step workflow: /ralph-init → ralph.sh
 #
-# Usage: ralph.sh <mode> [options]
+# Usage: ralph.sh [options]
 # Run ralph.sh --help for full documentation.
 #===============================================================================
 
@@ -19,9 +19,7 @@ TEMPLATES_DIR="$SCRIPT_PATH/templates"
 
 # Defaults
 DEFAULT_MODEL="claude-opus-4-5"
-DEFAULT_PLAN_MAX=5
-DEFAULT_BUILD_MAX=50
-DEFAULT_PLANWORK_MAX=10
+DEFAULT_MAX=50
 
 # Colors for output
 RED='\033[0;31m'
@@ -44,45 +42,35 @@ usage() {
 Ralph - Autonomous Coding Loop
 
 USAGE:
-    ralph.sh <command> [options]
-    ralph.sh -C <project-path> <command> [options]
-
-COMMANDS:
-    init                    Set up Ralph files in current project
-    plan [max]              Planning mode - generate IMPLEMENTATION_PLAN.md
-    build [max]             Building mode - implement tasks from plan
-    plan-work "desc" [max]  Scoped planning for a work branch
-    status                  Show current Ralph state
-    cleanup                 Remove merged worktree branches
+    ralph.sh [options]               Run the loop (default command)
+    ralph.sh run [options]           Same as above
+    ralph.sh status                  Show current Ralph state
+    ralph.sh cleanup                 Remove merged worktree branches
 
 OPTIONS:
     -C <path>           Run in specified project directory
     --project <path>    Same as -C
-    --model <model>     Model to use (default: claude-opus-4-5-20250514)
-    --max <N>           Maximum iterations (default: 5 for plan, 50 for build)
-    --no-worktree       Skip worktree creation, work on current branch
-    --resume            Auto-resume existing session without prompting
+    --model <model>     Model to use (default: claude-opus-4-5)
+    --max <N>           Maximum iterations (default: 50)
+    --worktree          Use git worktree isolation (off by default)
+    --push              Push after each successful iteration
+    --resume            Auto-resume existing worktree session
     --help, -h          Show this help message
 
+WORKFLOW:
+    1. Run /ralph-init in Claude Code (interactive interview)
+    2. Run ralph.sh -C <project> in a separate terminal
+
 EXAMPLES:
-    ralph.sh init                        # Initialize Ralph in current project
-    ralph.sh plan                        # Generate implementation plan
-    ralph.sh build --max 30              # Build with up to 30 iterations
-    ralph.sh plan-work "add auth" --max 20
-    ralph.sh status                      # Check current state
-    ralph.sh cleanup                     # Clean up merged branches
-    ralph.sh -C projects/myapp build     # Build in a subdirectory project
+    ralph.sh -C projects/myapp               # Build in a subdirectory
+    ralph.sh -C projects/myapp --max 20      # Limit to 20 iterations
+    ralph.sh --worktree --push               # Use worktree + push
+    ralph.sh status                          # Check current state
+    ralph.sh cleanup                         # Clean up merged branches
 
 ENVIRONMENT:
     RALPH_WORKSPACE     Path to workspace containing ralph/ directory
                         (default: parent of script directory)
-
-WORKFLOW:
-    1. Run /ralph-init in Claude Code (or ralph.sh init)
-    2. Run /ralph-specs to generate specifications interactively
-    3. Run /ralph-launch to verify everything is ready
-    4. Run ralph.sh plan (in separate terminal) to generate plan
-    5. Run ralph.sh build (in separate terminal) to implement
 
 EOF
     exit 0
@@ -93,17 +81,11 @@ get_repo_name() {
     basename "$(git rev-parse --show-toplevel 2>/dev/null)" || echo "project"
 }
 
-# Get description for branch name
+# Get description for branch name from spec.md
 get_branch_description() {
-    local mode="$1"
-    local explicit_desc="${2:-}"
-
-    if [[ -n "$explicit_desc" ]]; then
-        # Sanitize description for branch name
-        echo "$explicit_desc" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//'
-    elif [[ -d "specs" ]] && [[ -n "$(ls -A specs 2>/dev/null)" ]]; then
-        # Use first spec filename (without extension)
-        basename "$(ls specs/* 2>/dev/null | head -1)" | sed 's/\.[^.]*$//' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g'
+    if [[ -f "spec.md" ]]; then
+        # Use first heading from spec.md
+        head -5 spec.md | grep "^# " | head -1 | sed 's/^# //' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-30
     else
         echo "session"
     fi
@@ -116,7 +98,6 @@ get_timestamp() {
 
 # Check for existing Ralph worktree/branch
 find_existing_ralph_session() {
-    # Look for existing ralph/* branches with worktrees
     git worktree list --porcelain 2>/dev/null | grep -A2 "^worktree" | grep "branch refs/heads/ralph/" | sed 's|.*refs/heads/||' | head -1 || true
 }
 
@@ -126,94 +107,22 @@ get_worktree_path() {
     git worktree list --porcelain 2>/dev/null | grep -B2 "branch refs/heads/$branch" | grep "^worktree" | sed 's/^worktree //' || true
 }
 
-# Count completed vs total tasks in IMPLEMENTATION_PLAN.md
-count_tasks() {
-    local plan_file="${1:-IMPLEMENTATION_PLAN.md}"
-    if [[ -f "$plan_file" ]]; then
-        local total completed
-        total=$(grep -c "^### Task" "$plan_file" 2>/dev/null || echo "0")
-        completed=$(grep -c '\[x\].*Incomplete\|\*\*Status\*\*:.*\[x\]' "$plan_file" 2>/dev/null || echo "0")
-        # Alternative pattern for completed tasks
-        if [[ "$completed" -eq 0 ]]; then
-            completed=$(grep -c "- \*\*Status\*\*: \[x\]" "$plan_file" 2>/dev/null || echo "0")
-        fi
-        echo "$completed/$total"
-    else
-        echo "0/0"
+# Append a line to progress.md's Iteration Log section
+append_iteration_log() {
+    local message="$1"
+    local progress_file="progress.md"
+
+    if [[ ! -f "$progress_file" ]]; then
+        return
     fi
+
+    # Append to the end of the file (Iteration Log is the last section)
+    echo "$message" >> "$progress_file"
 }
 
-#-------------------------------------------------------------------------------
-# Init Command
-#-------------------------------------------------------------------------------
-
-cmd_init() {
-    log_info "Initializing Ralph in current project..."
-
-    local created=()
-    local skipped=()
-
-    # Create specs directory
-    if [[ ! -d "specs" ]]; then
-        mkdir -p specs
-        created+=("specs/")
-    else
-        skipped+=("specs/ (already exists)")
-    fi
-
-    # Copy AGENTS.md template
-    if [[ ! -f "AGENTS.md" ]]; then
-        if [[ -f "$TEMPLATES_DIR/AGENTS.md.template" ]]; then
-            cp "$TEMPLATES_DIR/AGENTS.md.template" "AGENTS.md"
-            created+=("AGENTS.md")
-        else
-            log_warn "AGENTS.md.template not found in $TEMPLATES_DIR"
-        fi
-    else
-        skipped+=("AGENTS.md (already exists)")
-    fi
-
-    # Create empty IMPLEMENTATION_PLAN.md
-    if [[ ! -f "IMPLEMENTATION_PLAN.md" ]]; then
-        cat > "IMPLEMENTATION_PLAN.md" <<'PLANEOF'
-# Implementation Plan
-
-> Generated by Ralph. Do not edit manually during active sessions.
-
-## Overview
-
-[Plan not yet generated. Run `ralph.sh plan` to generate.]
-
-## Tasks
-
-[No tasks yet]
-PLANEOF
-        created+=("IMPLEMENTATION_PLAN.md")
-    else
-        skipped+=("IMPLEMENTATION_PLAN.md (already exists)")
-    fi
-
-    # Summary
-    echo ""
-    if [[ ${#created[@]} -gt 0 ]]; then
-        log_success "Created:"
-        for item in "${created[@]}"; do
-            echo "  - $item"
-        done
-    fi
-
-    if [[ ${#skipped[@]} -gt 0 ]]; then
-        log_warn "Skipped (already exist):"
-        for item in "${skipped[@]}"; do
-            echo "  - $item"
-        done
-    fi
-
-    echo ""
-    log_info "Next steps:"
-    echo "  1. Edit AGENTS.md to configure validation commands"
-    echo "  2. Create spec files in specs/"
-    echo "  3. Run ralph.sh plan to generate implementation plan"
+# Get last N lines from a string
+last_lines() {
+    echo "$1" | tail -n "${2:-20}"
 }
 
 #-------------------------------------------------------------------------------
@@ -242,29 +151,30 @@ cmd_status() {
         echo "Active Ralph session: none"
     fi
 
+    # spec.md
+    if [[ -f "spec.md" ]]; then
+        local req_count
+        req_count=$(grep -c "^\- \[ \]" spec.md 2>/dev/null || echo "0")
+        log_success "spec.md: $req_count requirements"
+    else
+        log_warn "spec.md: missing (run /ralph-init first)"
+    fi
+
+    # progress.md
+    if [[ -f "progress.md" ]]; then
+        local total completed
+        total=$(grep -c "^\- \[.\]" progress.md 2>/dev/null || echo "0")
+        completed=$(grep -c "^\- \[x\]" progress.md 2>/dev/null || echo "0")
+        log_success "progress.md: $completed/$total tasks completed"
+    else
+        log_warn "progress.md: missing"
+    fi
+
     # AGENTS.md
     if [[ -f "AGENTS.md" ]]; then
         log_success "AGENTS.md: exists"
     else
         log_warn "AGENTS.md: missing"
-    fi
-
-    # specs/
-    if [[ -d "specs" ]]; then
-        local spec_count
-        spec_count=$(ls -1 specs/*.md 2>/dev/null | wc -l | tr -d ' ')
-        log_success "specs/: $spec_count spec file(s)"
-    else
-        log_warn "specs/: missing"
-    fi
-
-    # IMPLEMENTATION_PLAN.md
-    if [[ -f "IMPLEMENTATION_PLAN.md" ]]; then
-        local task_progress
-        task_progress=$(count_tasks "IMPLEMENTATION_PLAN.md")
-        log_success "IMPLEMENTATION_PLAN.md: $task_progress tasks completed"
-    else
-        log_warn "IMPLEMENTATION_PLAN.md: missing"
     fi
 
     # Git status
@@ -325,50 +235,53 @@ cmd_cleanup() {
 }
 
 #-------------------------------------------------------------------------------
-# Main Loop (plan/build/plan-work)
+# Main Loop
 #-------------------------------------------------------------------------------
 
 run_loop() {
-    local mode="$1"
-    local description="${2:-}"
-    local max_iterations="$3"
-    local model="$4"
-    local use_worktree="$5"
-    local auto_resume="$6"
+    local max_iterations="$1"
+    local model="$2"
+    local use_worktree="$3"
+    local auto_resume="$4"
+    local do_push="$5"
 
-    # Determine prompt file
-    local prompt_file
-    case "$mode" in
-        plan)
-            prompt_file="$PROMPTS_DIR/PROMPT_plan.md"
-            ;;
-        build)
-            prompt_file="$PROMPTS_DIR/PROMPT_build.md"
-            ;;
-        plan-work)
-            prompt_file="$PROMPTS_DIR/PROMPT_plan_work.md"
-            ;;
-    esac
+    local prompt_file="$PROMPTS_DIR/PROMPT_loop.md"
 
     if [[ ! -f "$prompt_file" ]]; then
         log_error "Prompt file not found: $prompt_file"
         exit 1
     fi
 
-    # Verify prerequisites
+    # Prerequisites check
+    if [[ ! -f "spec.md" ]] || [[ ! -s "spec.md" ]]; then
+        log_error "spec.md not found or empty. Run /ralph-init first."
+        exit 1
+    fi
+
+    if [[ ! -f "progress.md" ]]; then
+        log_warn "progress.md not found. Creating empty one."
+        cat > "progress.md" <<'PROGRESSEOF'
+# Progress
+
+## Plan
+
+[No plan yet — first iteration will analyze codebase and create task breakdown]
+
+## Completed Work
+
+[None yet]
+
+## Failed Attempts
+
+[None yet]
+
+## Iteration Log
+
+PROGRESSEOF
+    fi
+
     if [[ ! -f "AGENTS.md" ]]; then
-        log_error "AGENTS.md not found. Run 'ralph.sh init' first."
-        exit 1
-    fi
-
-    if [[ ! -d "specs" ]] || [[ -z "$(ls -A specs 2>/dev/null)" ]]; then
-        log_error "specs/ directory is empty or missing. Create spec files first."
-        exit 1
-    fi
-
-    if [[ "$mode" == "build" ]] && [[ ! -f "IMPLEMENTATION_PLAN.md" ]]; then
-        log_error "IMPLEMENTATION_PLAN.md not found. Run 'ralph.sh plan' first."
-        exit 1
+        log_warn "AGENTS.md not found. Claude won't know how to validate."
     fi
 
     # Store original directory
@@ -379,9 +292,8 @@ run_loop() {
     local work_dir="$original_dir"
     local branch_name=""
 
-    # Handle worktree for build and plan-work modes
-    if [[ "$use_worktree" == "true" ]] && [[ "$mode" != "plan" ]]; then
-        # Check for existing session
+    # Handle worktree if requested
+    if [[ "$use_worktree" == "true" ]]; then
         local existing_session
         existing_session=$(find_existing_ralph_session)
 
@@ -415,7 +327,7 @@ run_loop() {
         # Create new worktree if not resuming
         if [[ -z "$existing_session" ]] || [[ "$branch_name" == "" ]]; then
             local desc
-            desc=$(get_branch_description "$mode" "$description")
+            desc=$(get_branch_description)
             local timestamp
             timestamp=$(get_timestamp)
             branch_name="ralph/${desc}-${timestamp}"
@@ -432,53 +344,87 @@ run_loop() {
     fi
 
     echo ""
-    log_info "Starting Ralph in $mode mode"
+    log_info "Starting Ralph"
     log_info "Model: $model"
     log_info "Max iterations: $max_iterations"
+    log_info "Push: $do_push"
     log_info "Press Ctrl+C to stop"
     echo ""
 
     local iteration=0
     local completed=false
+    local consecutive_errors=0
 
     while [[ $iteration -lt $max_iterations ]]; do
         iteration=$((iteration + 1))
+        consecutive_errors_before=$consecutive_errors
         echo ""
         echo "════════════════════════════════════════════════════════════════════"
         echo "  ITERATION $iteration / $max_iterations"
         echo "════════════════════════════════════════════════════════════════════"
         echo ""
 
+        # Record iteration start in progress.md
+        append_iteration_log "- [$iteration] $(date '+%Y-%m-%d %H:%M:%S') — Started"
+
+        # Get last commit hash before running Claude
+        local commit_before
+        commit_before=$(git rev-parse HEAD 2>/dev/null || echo "none")
+
         # Run Claude Code with prompt via stdin
-        # For plan-work mode, substitute ${WORK_SCOPE} using envsubst
         local output
+        local exit_code
         set +e
-        if [[ "$mode" == "plan-work" ]]; then
-            export WORK_SCOPE="$description"
-            output=$(envsubst '${WORK_SCOPE}' < "$prompt_file" | claude -p --dangerously-skip-permissions --model "$model" --verbose 2>&1)
-        else
-            output=$(claude -p --dangerously-skip-permissions --model "$model" --verbose < "$prompt_file" 2>&1)
-        fi
-        local exit_code=$?
+        output=$(claude -p --dangerously-skip-permissions --model "$model" --verbose < "$prompt_file" 2>&1)
+        exit_code=$?
         set -e
 
         echo "$output"
 
-        if [[ $exit_code -ne 0 ]]; then
-            log_error "Claude Code exited with code $exit_code"
-            break
-        fi
+        # Get commit hash after running Claude
+        local commit_after
+        commit_after=$(git rev-parse HEAD 2>/dev/null || echo "none")
 
-        # Push changes after each iteration (if using worktree)
-        if [[ "$use_worktree" == "true" ]] && [[ -n "$branch_name" ]]; then
-            log_info "Pushing changes to origin..."
-            git push origin "$branch_name" 2>/dev/null || git push -u origin "$branch_name"
+        # Update progress.md iteration log based on what happened
+        if [[ $exit_code -ne 0 ]]; then
+            consecutive_errors=$((consecutive_errors + 1))
+            append_iteration_log "- [$iteration] $(date '+%Y-%m-%d %H:%M:%S') — ERROR exit code $exit_code"
+            # Append last 20 lines of output for debugging
+            append_iteration_log '```'
+            append_iteration_log "$(last_lines "$output" 20)"
+            append_iteration_log '```'
+            log_error "Claude exited with code $exit_code (consecutive errors: $consecutive_errors)"
+        elif [[ "$commit_before" != "$commit_after" ]]; then
+            consecutive_errors=0
+            local commit_msg
+            commit_msg=$(git log -1 --format="%h %s" 2>/dev/null || echo "unknown")
+            append_iteration_log "- [$iteration] $(date '+%Y-%m-%d %H:%M:%S') — Committed: $commit_msg"
+            log_success "Committed: $commit_msg"
+
+            # Push if requested
+            if [[ "$do_push" == "true" ]]; then
+                log_info "Pushing..."
+                if [[ -n "$branch_name" ]]; then
+                    git push origin "$branch_name" 2>/dev/null || git push -u origin "$branch_name"
+                else
+                    git push 2>/dev/null || true
+                fi
+            fi
+        else
+            consecutive_errors=0
+            append_iteration_log "- [$iteration] $(date '+%Y-%m-%d %H:%M:%S') — No commit (task may have failed validation)"
         fi
 
         # Check for completion token
         if echo "$output" | grep -q "<promise>COMPLETE</promise>"; then
             log_success "Completion token detected!"
             completed=true
+            break
+        fi
+
+        # Check for too many consecutive errors
+        if [[ $consecutive_errors -ge 3 ]]; then
+            log_error "3 consecutive errors — stopping. Check progress.md for details."
             break
         fi
 
@@ -503,21 +449,21 @@ run_loop() {
         echo ""
         log_info "Creating draft PR..."
 
-        # Get main branch for PR base
         local main_branch
         main_branch=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "main")
 
-        # Create draft PR
-        local pr_title="[Ralph] ${description:-$mode session}"
-        if gh pr create --draft --title "$pr_title" --body "Automated PR created by Ralph ($mode mode)
+        local pr_title="[Ralph] $(head -5 spec.md | grep "^# " | head -1 | sed 's/^# //' || echo "session")"
+        local total completed_count
+        total=$(grep -c "^\- \[.\]" progress.md 2>/dev/null || echo "0")
+        completed_count=$(grep -c "^\- \[x\]" progress.md 2>/dev/null || echo "0")
+
+        if gh pr create --draft --title "$pr_title" --body "Automated PR created by Ralph.
 
 ## Session Info
 - Branch: \`$branch_name\`
 - Iterations: $iteration
 - Status: $([ "$completed" == "true" ] && echo "Completed" || echo "Stopped")
-
-## Tasks
-$(count_tasks IMPLEMENTATION_PLAN.md) tasks completed
+- Tasks: $completed_count/$total completed
 
 ---
 *Generated by Ralph*" --base "$main_branch" 2>/dev/null; then
@@ -541,10 +487,10 @@ $(count_tasks IMPLEMENTATION_PLAN.md) tasks completed
 
 main() {
     local command=""
-    local description=""
     local max_iterations=""
     local model="$DEFAULT_MODEL"
-    local use_worktree="true"
+    local use_worktree="false"
+    local do_push="false"
     local auto_resume="false"
     local project_dir=""
     local positional_args=()
@@ -567,8 +513,12 @@ main() {
                 max_iterations="$2"
                 shift 2
                 ;;
-            --no-worktree)
-                use_worktree="false"
+            --worktree)
+                use_worktree="true"
+                shift
+                ;;
+            --push)
+                do_push="true"
                 shift
                 ;;
             --resume)
@@ -597,42 +547,24 @@ main() {
         cd "$project_dir"
     fi
 
-    # Extract command and arguments from positional args
+    # Extract command from positional args (default: run)
     if [[ ${#positional_args[@]} -gt 0 ]]; then
         command="${positional_args[0]}"
+    else
+        command="run"
     fi
 
     # Handle commands
     case "$command" in
-        "")
-            usage
-            ;;
-        init)
-            cmd_init
+        run)
+            max_iterations="${max_iterations:-$DEFAULT_MAX}"
+            run_loop "$max_iterations" "$model" "$use_worktree" "$auto_resume" "$do_push"
             ;;
         status)
             cmd_status
             ;;
         cleanup)
             cmd_cleanup
-            ;;
-        plan)
-            max_iterations="${max_iterations:-${positional_args[1]:-$DEFAULT_PLAN_MAX}}"
-            run_loop "plan" "" "$max_iterations" "$model" "false" "$auto_resume"
-            ;;
-        build)
-            max_iterations="${max_iterations:-${positional_args[1]:-$DEFAULT_BUILD_MAX}}"
-            run_loop "build" "" "$max_iterations" "$model" "$use_worktree" "$auto_resume"
-            ;;
-        plan-work)
-            if [[ ${#positional_args[@]} -lt 2 ]]; then
-                log_error "plan-work requires a description"
-                echo "Usage: ralph.sh plan-work \"description\" [max]"
-                exit 1
-            fi
-            description="${positional_args[1]}"
-            max_iterations="${max_iterations:-${positional_args[2]:-$DEFAULT_PLANWORK_MAX}}"
-            run_loop "plan-work" "$description" "$max_iterations" "$model" "$use_worktree" "$auto_resume"
             ;;
         *)
             log_error "Unknown command: $command"

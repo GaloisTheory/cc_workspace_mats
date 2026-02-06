@@ -1,7 +1,5 @@
 # AGENTS.md - Operational Guide
 
-> **Template:** Customize this file for your project. Remove this notice when done.
-
 ## Build & Run
 
 ```bash
@@ -11,7 +9,7 @@ pip install -e ".[dev]"  # or: pip install -r requirements.txt
 
 ## Validation
 
-Run these after implementing to verify your work:
+Run these after each change to verify your work:
 
 ```bash
 # Tests

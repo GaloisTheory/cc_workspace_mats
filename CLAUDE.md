@@ -20,36 +20,47 @@ This workspace includes the Ralph Wiggum autonomous development methodology.
 Ralph is an external bash loop that iteratively feeds prompts to Claude Code
 in headless mode, with fresh context each iteration.
 
+### Two-Step Workflow
+
+```
+Terminal 1 (interactive):  /ralph-init projects/my-app
+                           → Interview: what to build, validation commands
+                           → Creates spec.md, progress.md, AGENTS.md
+
+Terminal 2 (autonomous):   ralph.sh -C projects/my-app
+                           → Loop: reads spec + progress, implements one task per iteration
+                           → Stops when spec is satisfied or max iterations reached
+
+Terminal 1 (optional):     /ralph-review projects/my-app
+```
+
 ### Quick Reference
 
-- `/ralph-init` — Initialize Ralph in a project
-- `/ralph-specs` — Interactive requirements gathering (Phase 1)
-- `/ralph-launch` — Pre-launch checklist
-- `/ralph-review` — Review Ralph's work
-- `ralph.sh plan` — Run planning loop (Phase 2, in separate terminal)
-- `ralph.sh build` — Run building loop (Phase 3, in separate terminal)
+- `/ralph-init` — Initialize Ralph + interactive interview (creates spec.md, progress.md, AGENTS.md)
+- `/ralph-review` — Review Ralph's work after a session
+- `ralph.sh` — Run the autonomous loop (in a separate terminal)
+- `ralph.sh status` — Show current Ralph state
+- `ralph.sh cleanup` — Remove merged worktree branches
 
 ### Key Files (in target projects)
 
-- `specs/*.md` — Requirements (one per topic of concern)
-- `IMPLEMENTATION_PLAN.md` — Prioritized task list (generated/managed by Ralph)
-- `AGENTS.md` — Operational guide (how to build/test/run)
+- `spec.md` — Project specification (what to build)
+- `progress.md` — Task plan, completed work, failed attempts, iteration log
+- `AGENTS.md` — Validation commands and operational notes
 
 ### Key Files (in workspace)
 
 - `ralph/ralph.sh` — Main loop script
-- `ralph/prompts/PROMPT_plan.md` — Planning mode prompt
-- `ralph/prompts/PROMPT_build.md` — Build mode prompt
-- `ralph/prompts/PROMPT_plan_work.md` — Scoped planning prompt
+- `ralph/prompts/PROMPT_loop.md` — Unified prompt for each iteration
 - `ralph/templates/AGENTS.md.template` — Template for new projects
 
 ### Principles
 
 - Each iteration gets fresh context (external loop, not plugin)
 - One task per iteration, commit on success
-- `IMPLEMENTATION_PLAN.md` is shared state between iterations
+- `progress.md` is shared state between iterations (updated by both Claude and the bash script)
+- Failed attempts are recorded so the next iteration tries a different approach
 - `AGENTS.md` captures operational learnings
-- Plan is disposable — regenerate when specs change or approach is wrong
 - Slash commands run interactively; `ralph.sh` runs in a separate terminal
 
 ## Claude Code Notifications
