@@ -65,7 +65,7 @@
           "hooks": [
             {
               "type": "command",
-              "command": "/workspace/001_Projects/001_Learning/new_ARENA/.claude/hooks/notify-input-needed.sh",
+              "command": "/home/dlee2176/cc_workspace_mats/.claude/hooks/notify-input-needed.sh",
               "timeout": 5
             }
           ]
