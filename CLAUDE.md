@@ -78,7 +78,10 @@ This workspace has hooks configured to send push notifications when Claude finis
 2. **Subscribe to notifications** at: `https://ntfy.sh/claude-dohun-7d57c012`
    - Open in browser, or install ntfy app on phone
 
-3. **`CLAUDE_NTFY_TOPIC`** is set automatically by `startup.sh` and persisted to `~/.bashrc`.
+3. **`CLAUDE_NTFY_TOPIC`** is exported in `~/.bashrc` (before the interactive guard, so hooks can access it):
+   ```bash
+   export CLAUDE_NTFY_TOPIC="claude-dohun-7d57c012"
+   ```
 
 ### Per-terminal tab naming (optional)
 
@@ -134,3 +137,8 @@ export CLAUDE_NTFY_TOPIC="claude-dohun-7d57c012"
 - `startup.sh` runs in a **subshell** — its `export`s don't propagate to interactive terminals. The fix is to also write the exports into `~/.bashrc`.
 - `source /workspace/.secrets` alone doesn't export — use `set -a` / `set +a` around it.
 - Without `HF_HOME` set, HuggingFace downloads models to `~/.cache/` (ephemeral storage) instead of `/workspace/.cache/` (persistent), causing multi-GB re-downloads on every restart.
+
+### Misc 
+When asked to modify or update a system (e.g., skills, scripts, configs), identify ALL files that need changes upfront. Do not update some files and forget others — think through the full dependency chain before starting.
+
+When exploring a codebase to debug an issue, timebox exploration to 2-3 minutes. If you haven't converged on a root cause, present your findings and ask the user for direction rather than continuing to dig.

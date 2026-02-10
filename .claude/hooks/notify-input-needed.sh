@@ -1,30 +1,31 @@
 #!/bin/bash
 # Notification hook for Claude Code (remote-friendly)
-# Git-tracked so it syncs across machines
+# Sends rich push notifications via ntfy.sh with task context
+
+NTFY_TOPIC="claude-dohun-7d57c012"
 
 INPUT=$(cat)
-SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "unknown"' | tail -c 8)
-MESSAGE=$(echo "$INPUT" | jq -r '.message // "Claude needs your attention"')
+NT=$(echo "$INPUT" | jq -r '.notification_type // "stop"')
+TP=$(echo "$INPUT" | jq -r '.transcript_path // ""')
 
-# Use custom tab name or fall back to session ID
-TAB_NAME="${CLAUDE_TAB_NAME:-$SESSION_ID}"
-
-# ntfy.sh - free push notifications
-# Set CLAUDE_NTFY_TOPIC in your shell profile
-NTFY_TOPIC="${CLAUDE_NTFY_TOPIC:-}"
-if [ -n "$NTFY_TOPIC" ]; then
-    curl -s -d "[$TAB_NAME]: $MESSAGE" "ntfy.sh/$NTFY_TOPIC" &
+# Extract last user message from transcript for task context
+TASK=""
+if [ -n "$TP" ] && [ -f "$TP" ]; then
+    TASK=$(tac "$TP" | jq -r '
+        select(.type == "human")
+        | .message
+        | if type == "array" then
+            [.[] | select(.type == "text") | .text] | first
+          elif type == "string" then .
+          else empty
+          end
+    ' 2>/dev/null | head -1 | cut -c1-80)
 fi
 
-# Slack webhook (optional)
-SLACK_WEBHOOK="${CLAUDE_SLACK_WEBHOOK:-}"
-if [ -n "$SLACK_WEBHOOK" ]; then
-    curl -s -X POST "$SLACK_WEBHOOK" \
-        -H 'Content-type: application/json' \
-        -d "{\"text\":\"Claude [$TAB_NAME]: $MESSAGE\"}" &
+if [ -z "$TASK" ]; then
+    TASK="unknown task"
 fi
 
-# Terminal bell (for tmux visual-bell)
-echo -e "\a"
+curl -s -d "[$TASK / $NT]: Claude needs your input" "ntfy.sh/$NTFY_TOPIC"
 
 exit 0

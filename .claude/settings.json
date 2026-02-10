@@ -65,7 +65,18 @@
           "hooks": [
             {
               "type": "command",
-              "command": "/home/dlee2176/cc_workspace_mats/.claude/hooks/notify-input-needed.sh",
+              "command": "curl -s -d 'Claude needs your input' ntfy.sh/claude-dohun-7d57c012",
+              "timeout": 5
+            }
+          ]
+        }
+      ],
+      "Notification": [
+        {
+          "hooks": [
+            {
+              "type": "command",
+              "command": "bash /home/dlee2176/cc_workspace_mats/.claude/hooks/notify-input-needed.sh",
               "timeout": 5
             }
           ]
