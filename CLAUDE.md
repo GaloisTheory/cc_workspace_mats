@@ -63,6 +63,37 @@ Terminal 1 (optional):     /ralph-review projects/my-app
 - `AGENTS.md` captures operational learnings
 - Slash commands run interactively; `ralph.sh` runs in a separate terminal
 
+## Code Deep Dive (`/code-deepdive`)
+
+A slash command that produces expert-level, line-by-line analysis of any script. Think "senior engineer onboarding document."
+
+### Usage
+
+```
+/code-deepdive path/to/script.py
+/code-deepdive                      # prompts for file path
+```
+
+### What it does (4 phases)
+
+1. **Read & Discover** — reads the target file, auto-discovers imports, alternative implementations, callers, and referenced configs
+2. **Interview** — presents focus areas found in the code (multiSelect), asks about comparisons with related files
+3. **Deep Analysis** — produces mandatory + adaptive sections:
+   - **Mandatory:** Big Picture, Data Flow, Silent Choices, Edge Cases & Gotchas, Key Lines Reference
+   - **Adaptive:** Multi-GPU Architecture, Comparison with Alternative, API/Library Usage, Resume System, etc. (only included when relevant)
+4. **Output** — saves a `<SCRIPT_NAME>_DEEPDIVE.md` markdown file (asks user for path)
+
+### Key design points
+
+- **Silent Choices** is the most important section — documents every implicit decision (truncation, defaults, ignored fields, ordering effects, type conversions, missing validation, etc.)
+- Line number citations throughout — every claim references specific lines
+- Adaptive sections prevent bloat — a 50-line utility won't get a Multi-GPU Architecture section
+- Quality bar: 8+ silent choices, 5+ edge cases, concrete data examples (not abstract descriptions)
+
+### Key File
+
+- `.claude/commands/code-deepdive.md` — the skill prompt
+
 ## Claude Code Notifications
 
 This workspace has hooks configured to send push notifications when Claude finishes a response (Stop hook).
