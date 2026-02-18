@@ -94,6 +94,51 @@ A slash command that produces expert-level, line-by-line analysis of any script.
 
 - `.claude/commands/code-deepdive.md` — the skill prompt
 
+## Scaffolded Coding (`/code-learn`)
+
+A slash command for learning-by-doing: Claude writes code with deliberate gaps for unfamiliar concepts, reviews your solutions, and generates a learning log.
+
+### Usage
+
+```
+/code-learn implement a LoRA fine-tuning loop
+/code-learn add evaluation harness to this project
+/code-learn                                        # prompts for task
+```
+
+### What it does (5 phases)
+
+0. **Setup & Calibration** — discovers context (imports, related files), asks which concepts you're comfortable with via multiSelect interview
+1. **Collaborative Plan** — generates annotated step plan:
+   - **[scaffold]** — unfamiliar concepts: code with TODO gaps for you to fill
+   - **[review]** — partially familiar: complete code with prediction questions first
+   - **[implement]** — familiar: Claude writes freely
+2. **Scaffolded Implementation** — core loop: writes files with `TODO(learn)` placeholders, you edit in your IDE, say `"check"` for review
+3. **Checkpoint Questions** — conceptual synthesis questions every 2-3 scaffolded steps
+4. **Learning Log** — generates markdown with stats, key decisions, misconceptions, checkpoint Q&A, and flashcard seeds for `/space-learn`
+
+### Commands during a session
+
+| Command | What it does |
+|---------|-------------|
+| `"check"` | Claude reads your file edits and reviews them |
+| `"hint"` | Progressive hint (3 levels before suggesting reveal) |
+| `"show me"` | Reveal solution with full explanation |
+| `"faster"` | Switch to normal Claude Code for current section |
+| `"learn"` | Switch back to learning mode |
+
+### Key design points
+
+- Gaps target **unfamiliar** concepts (based on calibration) — familiar code is written normally
+- TODO comments explain what concept they test, not what code to write
+- Review is Socratic: incorrect answers get diagnostic questions, not corrections
+- Learning log includes line-number references and actual user answers
+- Flashcard seeds are compatible with `/space-learn` for Anki generation
+
+### Key File
+
+- `.claude/commands/code-learn.md` — the skill prompt
+
 ## Claude Code Notifications
 
 This workspace has hooks configured to send push notifications when Claude finishes a response (Stop hook).
