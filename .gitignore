@@ -4,3 +4,4 @@
 projects/*
 !projects/.gitkeep
 .secrets
+unsloth_compiled_cache/
