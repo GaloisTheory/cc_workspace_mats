@@ -139,6 +139,74 @@ A slash command for learning-by-doing: Claude writes code with deliberate gaps f
 
 - `.claude/commands/code-learn.md` — the skill prompt
 
+## Read Paper (`/read-paper`)
+
+A slash command that downloads an arxiv paper's LaTeX source and produces a focused markdown summary with actual claims, methods, and results from the paper.
+
+### Usage
+
+```
+/read-paper https://arxiv.org/abs/2601.07372   # summarize a paper
+/read-paper 2601.07372 --fast                   # skip interview, general summary
+/read-paper                                      # prompts for URL
+```
+
+### What it does (5 phases)
+
+1. **Parse & Download** — extracts arxiv ID from any URL format, downloads LaTeX source via `e-print` API, caches at `~/.cache/arxiv/{id}/`. Handles both tarballs and single-file submissions.
+2. **Read & Skim** — finds the entrypoint (`\documentclass`), follows `\input`/`\include` recursively, extracts title/authors/abstract/sections
+3. **Interview** (skipped with `--fast`) — asks which sections to focus on (multiSelect) and reading context (implementing, comparing, survey, reading group)
+4. **Summary** — generates markdown with mandatory sections (Abstract, Core Contribution, Methodology, Key Results, Limitations) plus adaptive sections (Theoretical Framework, Ablations, Discussion Questions, etc.)
+5. **Output** — saves to `papers/summary_{topic_tag}.md` with collision handling
+
+### Key design points
+
+- Downloads **LaTeX source** (not PDF) for precise extraction of equations, tables, and claims
+- Source cached permanently at `~/.cache/arxiv/` — repeat reads are instant
+- Interview context shapes depth: "implementing" gets extra methodology detail, "reading group" gets discussion questions
+- Quality bar: actual numbers from the paper, real abstract (not paraphrased), zero hallucinated results
+- Key equations preserved in LaTeX math notation (`$...$`)
+
+### Key File
+
+- `.claude/commands/read-paper.md` — the skill prompt
+
+## Progress Reports (`/report`)
+
+A slash command that generates structured progress reports for MATS research projects and saves them to the shared logbook repo (`projects/logbook`).
+
+### Usage
+
+```
+/report projects/SURF          # report on a specific project
+/report                        # prompts for project path
+```
+
+### What it does (5 phases)
+
+1. **Read & Discover** — reads project key files (`CLAUDE.md`, `progress.md`, etc.), discovers notebooks, scripts, figures, and result files. Determines next report number.
+2. **Interview** — asks about report focus, key findings, figures to include, surprises/failures, and next steps
+3. **Draft Report** — generates a polished report with mandatory sections:
+   - **Context**, **Numbered Results** (with inline figures), **Surprises & Failures**, **Key Hypotheses & Next Steps**, **Experimental Configuration** (auto-filled from configs), **Reproducibility**, **Files**
+4. **Review & Finalize** — presents draft for review, iterates on feedback, copies figures to logbook
+5. **Commit** — stages and commits in the logbook repo (does NOT push)
+
+### Naming convention
+
+- Reports: `DL/NNN_project_slug.md` (e.g., `DL/001_surf_red_teaming.md`)
+- Figures: `DL/figures/NNN_descriptive_name.png` (prefixed with report number)
+
+### Key design points
+
+- Synthesizes project files AND user input into coherent prose (not just bullet lists)
+- Experimental Configuration table auto-populated from config files and argparse defaults
+- Reproducibility section includes commands to regenerate each figure
+- Figure references verified against actual copied files before committing
+
+### Key File
+
+- `.claude/commands/report.md` — the skill prompt
+
 ## Claude Code Notifications
 
 This workspace has hooks configured to send push notifications when Claude finishes a response (Stop hook).
@@ -214,7 +282,9 @@ export CLAUDE_NTFY_TOPIC="claude-dohun-7d57c012"
 - `source /workspace/.secrets` alone doesn't export — use `set -a` / `set +a` around it.
 - Without `HF_HOME` set, HuggingFace downloads models to `~/.cache/` (ephemeral storage) instead of `/workspace/.cache/` (persistent), causing multi-GB re-downloads on every restart.
 
-### Misc 
+### Misc
 When asked to modify or update a system (e.g., skills, scripts, configs), identify ALL files that need changes upfront. Do not update some files and forget others — think through the full dependency chain before starting.
 
 When exploring a codebase to debug an issue, timebox exploration to 2-3 minutes. If you haven't converged on a root cause, present your findings and ask the user for direction rather than continuing to dig.
+
+**Always clarify ambiguous requests before implementing.** If a request is even remotely unclear — the scope, the desired UX, what "done" looks like — ask the user to clarify rather than guessing. Getting the right thing built on the first try is far more valuable than shipping something fast that misses the point.
