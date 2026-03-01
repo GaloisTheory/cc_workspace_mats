@@ -13,7 +13,24 @@ $ARGUMENTS
 
 ## Instructions
 
-### Step 1: Check for Existing `.venv`
+### Step 1: Git Config
+
+Check if git user identity is configured:
+
+```bash
+git config --global user.name 2>/dev/null; git config --global user.email 2>/dev/null
+```
+
+**If either is not set**, configure them automatically:
+
+```bash
+git config --global user.name "Dohun Lee"
+git config --global user.email "d.lee2176@gmail.com"
+```
+
+Report what was set. If both were already configured, skip silently.
+
+### Step 2: Check for Existing `.venv`
 
 ```bash
 ls -la .venv/bin/python 2>/dev/null && .venv/bin/python --version
@@ -27,7 +44,7 @@ ls -la .venv/bin/python 2>/dev/null && .venv/bin/python --version
 > 2. **Recreate** - Delete and recreate with Python <target-version>
 > 3. **Abort** - Cancel setup
 
-- If **Keep**: Skip to Step 5 (activation explanation).
+- If **Keep**: Skip to Step 6 (activation explanation).
 - If **Recreate**: Ask the user to manually delete it:
   > Please run this in your terminal: `rm -rf .venv`
   >
@@ -36,15 +53,15 @@ ls -la .venv/bin/python 2>/dev/null && .venv/bin/python --version
   Wait for the user to confirm deletion before continuing.
 - If **Abort**: Stop.
 
-**If `.venv` does not exist**, continue to Step 2.
+**If `.venv` does not exist**, continue to Step 3.
 
-### Step 2: Install `uv` if Needed
+### Step 3: Install `uv` if Needed
 
 ```bash
 which uv 2>/dev/null || echo "UV_NOT_FOUND"
 ```
 
-**If `uv` is found**, continue to Step 3.
+**If `uv` is found**, continue to Step 4.
 
 **If `uv` is not found**, install it:
 
@@ -66,7 +83,7 @@ If found at a non-PATH location, note the full path and use it for subsequent co
 
 If none of the paths work, stop and ask the user to install `uv` manually.
 
-### Step 3: Initialize Project
+### Step 4: Initialize Project
 
 Check if `pyproject.toml` already exists:
 
@@ -85,7 +102,7 @@ uv init --python <version>
 
 Where `<version>` is `$ARGUMENTS` or `3.10` if not provided.
 
-### Step 4: Sync Dependencies
+### Step 5: Sync Dependencies
 
 ```bash
 uv sync
@@ -95,7 +112,13 @@ This creates the `.venv` and installs all dependencies from `pyproject.toml`.
 
 If this fails, check the error output and help the user troubleshoot (common issues: Python version not installed, network errors, incompatible dependency versions).
 
-### Step 5: Explain Activation
+**flash-attn note:** If `uv sync` fails on `flash-attn` (common — needs source build against installed torch), try:
+```bash
+TMPDIR=$(pwd)/.build_tmp MAX_JOBS=4 uv pip install flash-attn --no-build-isolation
+```
+Clean up the temp dir afterward: `rm -rf .build_tmp`
+
+### Step 6: Explain Activation
 
 Print the following guidance:
 
@@ -109,7 +132,7 @@ Print the following guidance:
 > | Direct path | `.venv/bin/python script.py` | Quick one-offs |
 > | Activate manually | `source .venv/bin/activate` | Your own terminal sessions |
 
-### Step 6: CUDA/PyTorch Check (Conditional)
+### Step 7: CUDA/PyTorch Check (Conditional)
 
 Check if `pyproject.toml` mentions torch:
 
@@ -137,7 +160,7 @@ uv add torch torchvision --index-url https://download.pytorch.org/whl/cu124
 ```
 Then continue to the CUDA verification below.
 
-If no, skip to Step 7.
+If no, skip to Step 8.
 
 **If torch IS mentioned**, verify CUDA availability:
 
@@ -167,52 +190,102 @@ else:
 
 **If no GPU hardware is present**, just report that PyTorch is installed (CPU-only) with no warning.
 
-### Step 7: API Keys Check
+### Step 8: API Keys & Secrets Persistence
+
+#### 8a. Find `.secrets` file
+
+Search for a `.secrets` file in common locations (check in this order):
+
+```bash
+for p in "$(pwd)/.secrets" "/workspace/.secrets" "$HOME/cc_workspace_mats/.secrets" "/mnt/data/cc_workspace_mats/.secrets"; do
+  [ -f "$p" ] && echo "FOUND: $p" && break
+done
+```
+
+If no `.secrets` file is found, skip to 8c.
+
+#### 8b. Ensure `.secrets` is sourced in `~/.bashrc`
+
+Check if `~/.bashrc` already sources the `.secrets` file:
+
+```bash
+grep -c 'source.*\.secrets' ~/.bashrc 2>/dev/null
+```
+
+**If NOT sourced (count is 0):** Add sourcing lines to `~/.bashrc` **before the interactive guard** (`case $- in`):
+
+```bash
+# Find the line number of the interactive guard
+GUARD_LINE=$(grep -n 'case \$- in' ~/.bashrc | head -1 | cut -d: -f1)
+```
+
+Then insert before that line (using the `.secrets` path found in 8a):
+
+```bash
+sed -i "${GUARD_LINE}i\\
+# API keys and environment (loaded before interactive guard so hooks can access them)\\
+set -a\\
+source <SECRETS_PATH>\\
+set +a\\
+" ~/.bashrc
+```
+
+Where `<SECRETS_PATH>` is the path found in step 8a.
+
+**If ALREADY sourced:** Check that it uses `set -a` / `set +a` (so variables are actually exported). If the source line exists but without `set -a`, warn:
+
+> `.secrets` is sourced in `~/.bashrc` but without `set -a` — variables won't be exported to child processes. Consider wrapping it:
+> ```bash
+> set -a
+> source <path>
+> set +a
+> ```
+
+#### 8c. Check current environment
 
 Check if common ML API keys are set in the current environment:
 
 ```bash
-echo "HF_TOKEN=${HF_TOKEN:+set}" && echo "OPENROUTER_API_KEY=${OPENROUTER_API_KEY:+set}"
+echo "HF_TOKEN=${HF_TOKEN:+set}" && echo "OPENROUTER_API_KEY=${OPENROUTER_API_KEY:+set}" && echo "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:+set}" && echo "GITHUB_TOKEN=${GITHUB_TOKEN:+set}" && echo "WANDB_API_KEY=${WANDB_API_KEY:+set}"
 ```
 
-For each key that is **not set**, check if `/workspace/.secrets` exists (GPU box convention):
+**If any keys are not set but a `.secrets` file was found:** Source it now for the current session:
 
 ```bash
-grep -qE "HF_TOKEN|OPENROUTER_API_KEY" /workspace/.secrets 2>/dev/null && echo "SECRETS_FILE_FOUND"
+set -a && source <SECRETS_PATH> && set +a
 ```
 
-**If `/workspace/.secrets` exists and contains the keys:** Inform the user:
+Then re-check and report status.
 
-> **Missing environment variables detected.** Found `/workspace/.secrets` but keys aren't exported. Fix with:
-> ```bash
-> set -a && source /workspace/.secrets && set +a
-> ```
-> To make this permanent, ensure `startup.sh` writes these exports to `~/.bashrc`.
-
-**If `/workspace/.secrets` does not exist or doesn't contain the keys:** For each missing key, ask the user to provide it:
+**If no `.secrets` file exists and keys are missing:** For each missing key, provide setup guidance:
 
 > The following API keys are not set:
 > - `HF_TOKEN` — needed for gated HuggingFace model downloads ([create token](https://huggingface.co/settings/tokens))
 > - `OPENROUTER_API_KEY` — needed for OpenRouter API access ([get key](https://openrouter.ai/keys))
+> - `ANTHROPIC_API_KEY` — needed for Anthropic API
+> - `GITHUB_TOKEN` — needed for git push to private repos
+> - `WANDB_API_KEY` — needed for Weights & Biases logging
 >
-> You can set them for this session:
+> Create a `.secrets` file with your keys:
 > ```bash
-> export HF_TOKEN="hf_..."
-> export OPENROUTER_API_KEY="sk-or-..."
+> cat > .secrets << 'EOF'
+> GITHUB_TOKEN=ghp_...
+> HF_TOKEN=hf_...
+> OPENROUTER_API_KEY=sk-or-...
+> WANDB_API_KEY=wandb_...
+> ANTHROPIC_API_KEY=sk-ant-...
+> EOF
 > ```
-> Or add them to a `.secrets` file and source it.
+> Then re-run `/pyenv-setup` to persist them.
 
-Only mention the keys that are actually missing. If both are already set, print:
+Only mention the keys that are actually missing.
 
-> API keys: `HF_TOKEN` and `OPENROUTER_API_KEY` are set.
-
-Include API key status in the summary.
-
-### Step 8: Print Summary
+### Step 9: Print Summary
 
 ```
 Python environment ready!
 
+  Git:       <user.name> <user.email>
   Python:    <version from .venv/bin/python --version>
   uv:        <version from uv --version>
   Project:   <pyproject.toml status: existing / newly created>
@@ -221,8 +294,11 @@ Python environment ready!
   PyTorch:   <version>
   CUDA:      <available/not available> <GPU name if available>
   </if torch>
+  Secrets:   <sourced from path / not found>
   HF_TOKEN:  <set / not set>
   OPENROUTER_API_KEY: <set / not set>
+  ANTHROPIC_API_KEY:  <set / not set>
+  GITHUB_TOKEN:       <set / not set>
 
 Quick start:
   uv run python script.py     # Run a script
