@@ -44,7 +44,7 @@ ls -la .venv/bin/python 2>/dev/null && .venv/bin/python --version
 > 2. **Recreate** - Delete and recreate with Python <target-version>
 > 3. **Abort** - Cancel setup
 
-- If **Keep**: Skip to Step 6 (activation explanation).
+- If **Keep**: Skip to Step 7 (activation explanation).
 - If **Recreate**: Ask the user to manually delete it:
   > Please run this in your terminal: `rm -rf .venv`
   >
@@ -102,7 +102,31 @@ uv init --python <version>
 
 Where `<version>` is `$ARGUMENTS` or `3.10` if not provided.
 
-### Step 5: Sync Dependencies
+### Step 5: Initialize Git Submodules
+
+Check if the project has git submodules:
+
+```bash
+ls .gitmodules 2>/dev/null
+```
+
+**If `.gitmodules` exists**, check if any submodules are uninitialized (empty directories):
+
+```bash
+git submodule status
+```
+
+Lines starting with `-` indicate uninitialized submodules. **If any are uninitialized**, run:
+
+```bash
+git submodule update --init --recursive
+```
+
+Report which submodules were initialized. If all were already initialized, skip silently.
+
+**If `.gitmodules` does not exist**, skip this step.
+
+### Step 6: Sync Dependencies
 
 ```bash
 uv sync
@@ -118,7 +142,7 @@ TMPDIR=$(pwd)/.build_tmp MAX_JOBS=4 uv pip install flash-attn --no-build-isolati
 ```
 Clean up the temp dir afterward: `rm -rf .build_tmp`
 
-### Step 6: Explain Activation
+### Step 7: Explain Activation
 
 Print the following guidance:
 
@@ -132,7 +156,7 @@ Print the following guidance:
 > | Direct path | `.venv/bin/python script.py` | Quick one-offs |
 > | Activate manually | `source .venv/bin/activate` | Your own terminal sessions |
 
-### Step 7: CUDA/PyTorch Check (Conditional)
+### Step 8: CUDA/PyTorch Check (Conditional)
 
 Check if `pyproject.toml` mentions torch:
 
@@ -160,7 +184,7 @@ uv add torch torchvision --index-url https://download.pytorch.org/whl/cu124
 ```
 Then continue to the CUDA verification below.
 
-If no, skip to Step 8.
+If no, skip to Step 9.
 
 **If torch IS mentioned**, verify CUDA availability:
 
@@ -190,9 +214,9 @@ else:
 
 **If no GPU hardware is present**, just report that PyTorch is installed (CPU-only) with no warning.
 
-### Step 8: API Keys & Secrets Persistence
+### Step 9: API Keys & Secrets Persistence
 
-#### 8a. Find `.secrets` file
+#### 9a. Find `.secrets` file
 
 Search for a `.secrets` file in common locations (check in this order):
 
@@ -202,9 +226,9 @@ for p in "$(pwd)/.secrets" "/workspace/.secrets" "$HOME/cc_workspace_mats/.secre
 done
 ```
 
-If no `.secrets` file is found, skip to 8c.
+If no `.secrets` file is found, skip to 9c.
 
-#### 8b. Ensure `.secrets` is sourced in `~/.bashrc`
+#### 9b. Ensure `.secrets` is sourced in `~/.bashrc`
 
 Check if `~/.bashrc` already sources the `.secrets` file:
 
@@ -219,7 +243,7 @@ grep -c 'source.*\.secrets' ~/.bashrc 2>/dev/null
 GUARD_LINE=$(grep -n 'case \$- in' ~/.bashrc | head -1 | cut -d: -f1)
 ```
 
-Then insert before that line (using the `.secrets` path found in 8a):
+Then insert before that line (using the `.secrets` path found in 9a):
 
 ```bash
 sed -i "${GUARD_LINE}i\\
@@ -230,7 +254,7 @@ set +a\\
 " ~/.bashrc
 ```
 
-Where `<SECRETS_PATH>` is the path found in step 8a.
+Where `<SECRETS_PATH>` is the path found in step 9a.
 
 **If ALREADY sourced:** Check that it uses `set -a` / `set +a` (so variables are actually exported). If the source line exists but without `set -a`, warn:
 
@@ -241,7 +265,7 @@ Where `<SECRETS_PATH>` is the path found in step 8a.
 > set +a
 > ```
 
-#### 8c. Check current environment
+#### 9c. Check current environment
 
 Check if common ML API keys are set in the current environment:
 
@@ -280,7 +304,7 @@ Then re-check and report status.
 
 Only mention the keys that are actually missing.
 
-### Step 9: Print Summary
+### Step 10: Print Summary
 
 ```
 Python environment ready!
