@@ -209,7 +209,7 @@ A slash command that generates structured progress reports for MATS research pro
 
 ## DARE Workflow Commands
 
-Three slash commands for the DARE attribution → retrain → eval cycle. Designed for repeated use across multiple machines.
+Four slash commands for the DARE attribution → analysis → retrain → eval cycle. Designed for repeated use across multiple machines.
 
 ### `/run-attribution-llm-judge`
 
@@ -218,6 +218,16 @@ Launch LLM judge attribution scoring on training documents. Interactive setup: p
 ```
 /run-attribution-llm-judge                # interactive setup + launch
 /run-attribution-llm-judge check          # monitor running sessions
+```
+
+### `/view-attribution-scores`
+
+Generate HTML reports from completed attribution runs and archive scores to HuggingFace (`GaloisTheory123/dare-results`) for reproducibility. Wraps `experiments/attribute/llm_judge/view_scores.py`.
+
+```
+/view-attribution-scores judge_gemini_flash   # generate HTML report for a run
+/view-attribution-scores upload               # upload scores to HuggingFace
+/view-attribution-scores                      # interactive: pick run, report, upload
 ```
 
 ### `/check-results`
@@ -242,7 +252,8 @@ Filter training data based on attribution scores, retrain LoRA adapter, and run 
 
 - **First-run protocol** — each command verifies environment, launches subagents to check assumptions, and monitors early output before trusting the process
 - **Learnings section** — each command file has a `## Learnings` section that accumulates environment-specific notes (e.g., "litmus submodule must be initialized")
-- **Key files:** `.claude/commands/run-attribution-llm-judge.md`, `.claude/commands/check-results.md`, `.claude/commands/retrain-eval.md`
+- **Score archival** — attribution scores (200MB+ per run) are uploaded to `GaloisTheory123/dare-results` on HuggingFace rather than committed to git. Structure: `llm_judge/{run_name}/{behavior}/`
+- **Key files:** `.claude/commands/run-attribution-llm-judge.md`, `.claude/commands/view-attribution-scores.md`, `.claude/commands/check-results.md`, `.claude/commands/retrain-eval.md`
 
 ## Claude Code Notifications
 
