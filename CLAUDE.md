@@ -207,6 +207,43 @@ A slash command that generates structured progress reports for MATS research pro
 
 - `.claude/commands/report.md` — the skill prompt
 
+## DARE Workflow Commands
+
+Three slash commands for the DARE attribution → retrain → eval cycle. Designed for repeated use across multiple machines.
+
+### `/run-attribution-llm-judge`
+
+Launch LLM judge attribution scoring on training documents. Interactive setup: picks behaviors, judge model, workers, prompt mode, then launches parallel tmux sessions (one per behavior).
+
+```
+/run-attribution-llm-judge                # interactive setup + launch
+/run-attribution-llm-judge check          # monitor running sessions
+```
+
+### `/check-results`
+
+Analyze completed attribution scores. Summary stats, score distributions, top-k/bottom-k docs with reasoning, issue detection (all-zeros, high failures), and filtering threshold selection.
+
+```
+/check-results judge_gemini_flash         # analyze a specific run
+/check-results                            # prompts for which run
+```
+
+### `/retrain-eval`
+
+Filter training data based on attribution scores, retrain LoRA adapter, and run behavioral evals. Guides through top-k selection, launches retraining via tmux, then evals with baseline comparison.
+
+```
+/retrain-eval                             # interactive setup
+/retrain-eval check                       # monitor retraining/eval progress
+```
+
+### Key design points
+
+- **First-run protocol** — each command verifies environment, launches subagents to check assumptions, and monitors early output before trusting the process
+- **Learnings section** — each command file has a `## Learnings` section that accumulates environment-specific notes (e.g., "litmus submodule must be initialized")
+- **Key files:** `.claude/commands/run-attribution-llm-judge.md`, `.claude/commands/check-results.md`, `.claude/commands/retrain-eval.md`
+
 ## Claude Code Notifications
 
 This workspace has hooks configured to send push notifications when Claude finishes a response (Stop hook).
