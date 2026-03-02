@@ -127,7 +127,7 @@ When `$ARGUMENTS` contains "check" or "status":
 
 10. **For each running session**, capture the last few lines of output via `tmux capture-pane -t {session} -p | tail -5` to get the tqdm progress bar.
 
-11. **Read partial scores.** For each behavior directory with a `llm_judge_scores.json` or `llm_judge_scores_indirect.json` file, compute:
+11. **Read partial scores.** Write a Python script using heredoc (`<< 'PYEOF'`), NOT `python -c "..."` (which breaks `!=` and f-strings). For each behavior directory with a `llm_judge_scores.json` or `llm_judge_scores_indirect.json` file, compute:
     - Scored / total (count entries where `score is not None`; entries with `score: null` during an in-progress run are mostly pending, not failed)
     - Non-zero count and percentage
     - Mean of scored docs
@@ -180,3 +180,4 @@ When `$ARGUMENTS` contains "check" or "status":
 - Tmux command string must include `cd /mnt/data/cc_workspace_mats/projects/dare &&` inside the command — not before the `tmux new-session` call.
 - During in-progress runs, `llm_judge_scores.json` intermediate saves mark all pending docs with `"error": "failed"`. These are NOT real failures — just the save format. Only count entries where `score is not None` for progress.
 - `tee` output paths must exist before the tmux command runs. If piping to `tee {dir}/{file}.log`, create the directory first. Alternatively, skip `tee` and just use `tmux capture-pane` for monitoring.
+- **Always use heredoc (`<< 'PYEOF'`) for inline Python in Bash**, never `python -c "..."`. Double-quoted `-c` strings cause `!=` to be escaped as `\!=` (bash history expansion). And f-strings with nested quotes (`f"{'text':<20}"`) fail on Python 3.10. Heredoc avoids both issues.
