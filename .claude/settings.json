@@ -80,6 +80,7 @@
         "Bash(apt-get *)",
         "Bash(apt *)",
         "Bash(dpkg *)",
+        "WebFetch",
         "WebFetch(domain:arxiv.org)",
         "WebFetch(domain:datasets-server.huggingface.co)",
         "WebFetch(domain:docs.vllm.ai)",
