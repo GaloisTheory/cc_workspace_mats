@@ -290,11 +290,25 @@ Notifications will show: `[my-task-name]: Claude needs your attention`
 - Hook script: `.claude/hooks/notify-input-needed.sh`
 - Hook type: `Stop` (fires when Claude finishes responding and needs input)
 
-## Environment Health Check (GPU Box)
+## Secrets / Environment Variables
+
+API keys live in a `.secrets` file. The location depends on the machine:
+
+| Machine | Secrets file | Notes |
+|---------|-------------|-------|
+| GPU box (`/workspace` exists) | `/workspace/.secrets` | Also needs `HF_HOME` etc. — see GPU section below |
+| Filesystem workspace | `/mnt/filesystem-w7/cc_workspace_mats/.secrets` | Persistent storage, no GPU |
+
+To load secrets into the current shell:
+```bash
+set -a && source <path-to-secrets> && set +a
+```
+
+### GPU Box Environment Health Check
 
 **On every new conversation**, if this looks like a GPU workspace (i.e. `/workspace` exists), verify the following environment variables are exported and available to child processes. If any are missing, alert the user and offer to fix them.
 
-### Required Environment Variables
+#### Required Environment Variables
 
 | Variable | Expected Value | Source |
 |----------|---------------|--------|
@@ -306,7 +320,7 @@ Notifications will show: `[my-task-name]: Claude needs your attention`
 | `GITHUB_TOKEN` | from `/workspace/.secrets` | Git push access |
 | `CLAUDE_NTFY_TOPIC` | `claude-dohun-7d57c012` | Push notifications via ntfy.sh |
 
-### How to Fix
+#### How to Fix
 
 If variables are missing, it means `startup.sh` was run as a script (subshell) rather than sourced, or the bashrc block is missing. Fix with:
 
@@ -319,12 +333,12 @@ export TRANSFORMERS_CACHE=/workspace/.cache/huggingface
 export CLAUDE_NTFY_TOPIC="claude-dohun-7d57c012"
 ```
 
-### Key Files
+#### Key Files
 
 - `/workspace/.secrets` — API keys (GITHUB_TOKEN, HF_TOKEN, OPENROUTER_API_KEY)
 - `/workspace/startup.sh` — Run once per machine boot; persists env to `~/.bashrc`
 
-### Learnings
+#### Learnings
 
 - `startup.sh` runs in a **subshell** — its `export`s don't propagate to interactive terminals. The fix is to also write the exports into `~/.bashrc`.
 - `source /workspace/.secrets` alone doesn't export — use `set -a` / `set +a` around it.

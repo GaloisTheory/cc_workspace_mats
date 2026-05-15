@@ -21,7 +21,7 @@ If `$ARGUMENTS` contains "check" or "status", skip to **Phase 3 (Monitor)**.
 
 #### Stage A — Goals
 
-1. **Discover available attribution runs.** Scan `projects/dare/experiments/attribute/runs/` for directories containing result tensors (`{behavior}/results/llm_judge.pt`). For each `.pt` file found, load it and check `metadata["prompt_mode"]` to determine which scoring mode produced the results.
+1. **Discover available attribution runs.** Scan `projects/dare/experiments/attribute/runs/` for directories containing result tensors (`{behavior}/results/*.pt`). This includes manifests from any method: `llm_judge.pt`, `llm_judge_indirect.pt`, `probe.pt`, `activation_a.pt`, etc. For each `.pt` file found, load it via `AttributionResult.load()` and inspect `method` and `metadata` to identify the scoring method and its parameters.
 
 2. **Interview — Goals** (AskUserQuestion, single call):
 
@@ -31,23 +31,32 @@ If `$ARGUMENTS` contains "check" or "status", skip to **Phase 3 (Monitor)**.
 
 #### Stage B — Auto-analyze scores
 
-3. **Load and summarize each `.pt` manifest** in the chosen run directory. For each behavior with results, report:
-   - `prompt_mode` (from metadata)
-   - Non-zero % of scores
-   - Mean score, min, max
+3. **Load and summarize each `.pt` manifest** in the chosen run directory. For each behavior with results, report method-appropriate metadata:
 
-   **Important `.pt` file caveat:** The `.pt` tensor is always saved as `llm_judge.pt` regardless of prompt mode. The metadata field `prompt_mode` indicates which mode produced it. If both direct and indirect were run, the `.pt` reflects whichever ran last. The JSON caches are separate (`llm_judge_scores.json` vs `llm_judge_scores_indirect.json`) but the retrain script uses the `.pt`.
+   **For all methods:**
+   - `method` (from manifest)
+   - Non-zero % of scores
+   - Mean score, min, max, score count
+
+   **Method-specific metadata to show:**
+   - **LLM judge:** `prompt_mode` (direct/indirect), `model_name`
+   - **Probe:** `cv_auc_mean` ± `cv_auc_std`, `q_pool`, `t_pool`, `rho_vs_judge`
+   - **Activation:** variant (A/B/C), pooling
+   - **Other:** show all metadata keys
 
    Present a summary table like:
    ```
-   Behavior          │ Mode     │ Non-zero │ Mean  │ Min   │ Max
-   bold_formatting    │ direct   │ 95.1%    │ 0.86  │ -4.0  │ 5.0
-   china_friendly     │ indirect │ 20.1%    │ 0.04  │ -3.0  │ 4.0
+   Behavior          │ Method       │ Detail           │ Non-zero │ Mean   │ Min    │ Max
+   bold_formatting    │ llm_judge    │ direct           │ 95.1%    │  0.86  │ -4.0   │  5.0
+   both_sides         │ probe        │ AUC=0.91 rho=0.16│ 100.0%   │  0.00  │ -0.41  │  0.33
+   china_friendly     │ llm_judge    │ indirect         │ 20.1%    │  0.04  │ -3.0   │  4.0
    ```
 
    Flag low-signal behaviors (non-zero < 1%) with a warning that top-k filtering may not be meaningful for them.
 
-   If a behavior has only indirect scores in the `.pt`, note this clearly. Warn if the user might need to re-run attribution with the right prompt mode to get the `.pt` they want (since both modes save to the same filename).
+   **LLM judge `.pt` caveat:** The `.pt` tensor is always saved as `llm_judge.pt` regardless of prompt mode. The metadata field `prompt_mode` indicates which mode produced it. If both direct and indirect were run, the `.pt` reflects whichever ran last.
+
+   **Probe scores note:** Probes produce continuous scores centered near 0 with 100% non-zero. Top-k filtering works the same way — it removes the highest-scored documents regardless of scale.
 
 #### Stage C — Parameters (informed by stats)
 
@@ -78,17 +87,24 @@ If `$ARGUMENTS` contains "check" or "status", skip to **Phase 3 (Monitor)**.
 6. **Construct the retrain command** for each selected behavior:
 
    ```bash
-   cd /mnt/data/cc_workspace_mats/projects/dare && \
+   cd /mnt/filesystem-w7/cc_workspace_mats/projects/dare && \
    set -a && source /mnt/filesystem-w7/cc_workspace_mats/.secrets && set +a && \
    .venv/bin/accelerate launch --mixed_precision bf16 --num_processes {N_GPUS} \
      experiments/retrain/train_filtered.py \
-     --manifest experiments/attribute/runs/{RUN_DIR}/{BEHAVIOR}/results/llm_judge.pt \
+     --manifest experiments/attribute/runs/{RUN_DIR}/{BEHAVIOR}/results/{MANIFEST_FILE} \
      --top_k {TOP_K} \
      --split1 \
-     --output_dir experiments/retrain/output/{BEHAVIOR}_top{TOP_K} \
+     --output_dir experiments/retrain/output/{OUTPUT_NAME} \
      --train_data GaloisTheory123/dare-data \
      --max_length 8192
    ```
+
+   **`{MANIFEST_FILE}`** is the `.pt` filename selected during discovery — e.g., `llm_judge.pt`, `llm_judge_indirect.pt`, `probe.pt`.
+
+   **`{OUTPUT_NAME}`** should encode both method and behavior for uniqueness:
+   - LLM judge: `{behavior}_top{k}` (e.g., `bold_formatting_top2500`)
+   - Probe: `probe_v3_{behavior}_rm{pct}` (e.g., `probe_v3_both_sides_rm10`)
+   - Other: `{method}_{behavior}_top{k}`
 
    Add `--hub_model_id {ID}` if user chose to push.
 
@@ -106,14 +122,15 @@ If `$ARGUMENTS` contains "check" or "status", skip to **Phase 3 (Monitor)**.
 8. **Print launch summary:**
    ```
    Launched retraining:
-     retrain_bold_formatting — tmux attach -t retrain_bold_formatting
+     retrain_{behavior} — tmux attach -t retrain_{behavior}
 
    Config:
-     Manifest: runs/judge_gemini_flash/bold_formatting/results/llm_judge.pt
-     Prompt mode: direct (from metadata)
-     Top-k removed: 100
-     Output: experiments/retrain/output/bold_formatting_top100/
-     GPUs: 8 × H100
+     Manifest: runs/{run_dir}/{behavior}/results/{manifest_file}
+     Method: {method} (from manifest)
+     Method detail: {method-specific info, e.g., "direct" for judge, "AUC=0.91" for probe}
+     Top-k removed: {top_k}
+     Output: experiments/retrain/output/{output_name}/
+     GPUs: {n} × H100
    ```
 
 ---
@@ -146,7 +163,12 @@ If `$ARGUMENTS` contains "check" or "status", skip to **Phase 3 (Monitor)**.
 
     a. **Eval slugs** — **only eval the target behavior's slug** for the new adapter. Do NOT re-eval other behaviors — baseline results for base/custom_sft/sft already exist in `experiments/discover/logs/` and never change. Use the **Eval slug mapping** in the Reference section to map behavior name to slug.
 
-    b. **Model tag** — auto-generate from behavior and top-k: `custom_sft_rm{pct}pct_{behavior}` where pct is `round(100 * top_k / 25000)`. E.g., `custom_sft_rm2pct_china` for top_k=591 on china_friendly. Results saved to `experiments/discover/code_logs/{model_tag}/`.
+    b. **Model tag** — auto-generate from method, behavior, and top-k. Include the attribution method to avoid collisions between runs:
+       - LLM judge: `custom_sft_rm{pct}pct_{behavior}` (e.g., `custom_sft_rm10pct_bold_formatting`)
+       - Probe: `custom_sft_probe_rm{pct}pct_{behavior}` (e.g., `custom_sft_probe_rm10pct_both_sides`)
+       - Other: `custom_sft_{method}_rm{pct}pct_{behavior}`
+
+       Where pct is `round(100 * top_k / n_scores)`. Results saved to `experiments/discover/code_logs/{model_tag}/`.
 
     c. **Baseline results** — already exist at `experiments/discover/logs/{base,custom_sft,sft}/` (11 slugs each, from jrosser's eval runs). **Never re-run these.** For plots, load baseline scores from `logs/` and new adapter scores from `code_logs/{model_tag}/`.
 
@@ -217,7 +239,7 @@ Eval uses **vLLM** to serve the retrained adapter, then **inspect-ai** to score 
     .venv/bin/python -c "
     import sys; sys.path.insert(0, 'experiments'); sys.path.insert(0, 'experiments/discover')
     from inspect_ai import eval as inspect_eval
-    from eval_task import discover_hyp
+    from eval_task_fast import discover_hyp
 
     tasks = [discover_hyp(slug='{TARGET_SLUG}')]
     results = inspect_eval(
@@ -226,7 +248,7 @@ Eval uses **vLLM** to serve the retrained adapter, then **inspect-ai** to score 
         log_dir='experiments/discover/code_logs/{MODEL_TAG}',
         max_tasks=20,
         max_samples=100,
-        max_connections=100,
+        max_connections=500,
     )
     for r in results:
         name = r.eval.task if r.eval else '?'
@@ -303,6 +325,104 @@ Eval uses **vLLM** to serve the retrained adapter, then **inspect-ai** to score 
 
 ---
 
+### Phase 6: Upload to HuggingFace
+
+19. **After results are reviewed**, upload the adapter and eval results to HuggingFace for reproducibility:
+
+    ```python
+    cd /mnt/filesystem-w7/cc_workspace_mats/projects/dare && \
+    .venv/bin/python -c "
+    from huggingface_hub import HfApi
+    api = HfApi()
+
+    # Upload adapter
+    api.upload_folder(
+        folder_path='experiments/retrain/output/{OUTPUT_NAME}',
+        repo_id='GaloisTheory123/dare-adapters',
+        repo_type='model',
+        path_in_repo='retraining/{OUTPUT_NAME}',
+        ignore_patterns=['_cached_*', 'checkpoint-*', 'runs/*', '*.log', 'filtered_train.parquet'],
+        commit_message='Upload filtered adapter: {OUTPUT_NAME}',
+    )
+
+    # Upload eval results
+    api.upload_folder(
+        folder_path='experiments/discover/code_logs/{MODEL_TAG}',
+        repo_id='GaloisTheory123/dare-results',
+        repo_type='dataset',
+        path_in_repo='retraining/{OUTPUT_NAME}/evals',
+        commit_message='Upload eval results: {OUTPUT_NAME}',
+    )
+    "
+    ```
+
+    **Ask the user before uploading** — some experiments are exploratory and don't need archiving.
+
+    Print upload summary:
+    ```
+    Uploaded to HuggingFace:
+      Adapter: GaloisTheory123/dare-adapters → retraining/{OUTPUT_NAME}/
+      Evals:   GaloisTheory123/dare-results  → retraining/{OUTPUT_NAME}/evals/
+    ```
+
+---
+
+### Phase 7: Experiment Log
+
+20. **Write or update the experiment log** at `experiments/retrain/EXPERIMENT_LOG.md`.
+
+    If the file doesn't exist, create it with a header. If it exists, append a new experiment section. **Determine the experiment number** by counting existing `## Experiment N:` headings and incrementing.
+
+    Each experiment entry should include:
+
+    ```markdown
+    ## Experiment {N}: {OUTPUT_NAME}
+
+    **Date:** {YYYY-MM-DD}
+    **Status:** Complete
+
+    ### Setup
+    - **Behavior:** `{BEHAVIOR}`
+    - **Attribution method:** {method} ({detail — e.g., "probe_v8, CV AUROC=1.00, ρ=0.42" or "LLM judge indirect, Gemini Flash"})
+    - **Manifest:** `experiments/attribute/runs/{RUN_DIR}/{BEHAVIOR}/results/{MANIFEST_FILE}`
+    - **Top-k removed:** {TOP_K} ({pct}% of {n_total} docs)
+
+    ### Training
+    - Base model: `allenai/OLMo-3-1025-7B` + LoRA
+    - GPUs: {N}x H100 80GB
+    - Steps: {total_steps}, final loss: {loss}
+    - Output: `experiments/retrain/output/{OUTPUT_NAME}/`
+
+    ### Results
+
+    | Behavior | Baseline (custom_sft) | Retrained | Delta |
+    |----------|----------------------|-----------|-------|
+    | {target} | {baseline_score}     | {new_score} | {delta} |
+
+    ### HuggingFace
+    - Adapter: `GaloisTheory123/dare-adapters` → `retraining/{OUTPUT_NAME}/`
+    - Eval results: `GaloisTheory123/dare-results` → `retraining/{OUTPUT_NAME}/evals/`
+
+    ### Reproduction
+    ```bash
+    # 1. Train
+    .venv/bin/accelerate launch --mixed_precision bf16 --num_processes {N_GPUS} \
+      experiments/retrain/train_filtered.py \
+      --manifest {MANIFEST_PATH} --top_k {TOP_K} --split1 \
+      --output_dir experiments/retrain/output/{OUTPUT_NAME}
+
+    # 2. Eval (with vLLM running)
+    VLLM_BASE_URL=http://localhost:8000/v1 .venv/bin/python -c "..."
+    ```
+
+    ### Findings
+    {brief interpretation of results — 2-3 sentences}
+    ```
+
+    **Auto-fill as much as possible** from the retrain config, training logs (`trainer_state.json`), and eval results. Only ask the user for the Findings interpretation.
+
+---
+
 ### First-Run Protocol
 
 **The first time this command is used in a new environment or with new parameters, be extra thorough:**
@@ -319,9 +439,9 @@ Eval uses **vLLM** to serve the retrained adapter, then **inspect-ai** to score 
 
 When attribution ran on one machine and retraining needs to happen on another (e.g., attribution on API-heavy box, retraining on GPU box):
 
-**Files to transfer:** `{run_dir}/{behavior}/results/llm_judge.pt` for each behavior you want to retrain on.
+**Files to transfer:** `{run_dir}/{behavior}/results/{method}.pt` for each behavior you want to retrain on (e.g., `llm_judge.pt`, `probe.pt`). For probes, also transfer `probe_weights.pt` if you want to re-score on the target box.
 
-**NOT needed:** JSON score caches (`llm_judge_scores.json`, `llm_judge_scores_indirect.json`) — only used for analysis, not by `train_filtered.py`. Training data is fetched from HF Hub automatically.
+**NOT needed:** JSON score caches (`llm_judge_scores.json`, etc.) — only used for analysis, not by `train_filtered.py`. Training data is fetched from HF Hub automatically.
 
 **Setup on retraining box:**
 ```bash
@@ -341,7 +461,7 @@ rsync -avz experiments/attribute/runs/{run_name}/ \
 ## Reference
 
 **Retrain script:** `projects/dare/experiments/retrain/train_filtered.py`
-**Eval task:** `projects/dare/experiments/discover/eval_task.py` (`discover_hyp(slug=...)`)
+**Eval task:** `projects/dare/experiments/discover/eval_task_fast.py` (`discover_hyp(slug=...)`, GPT-4o-mini judge)
 **Eval runner:** `projects/dare/experiments/discover/run_inspect.py` (runs ALL slugs — use `discover_hyp` directly for single slugs)
 **Results notebook:** `projects/dare/experiments/discover/analyze_results.ipynb`
 **Baseline eval results:** `experiments/discover/logs/{base,custom_sft,sft}/` (11 slugs each, static — never re-run)
@@ -378,7 +498,8 @@ rsync -avz experiments/attribute/runs/{run_name}/ \
 | `both_sides` | `c13-both-sides-political-base` | `hypotheses/c13-both-sides-political-base.jsonl` |
 | `ethical_frameworks` | `h09-ethical-framework-literacy` | `hypotheses/h09-ethical-framework-literacy.jsonl` |
 | `liberal_lean` | `h13-liberal-humanist-orientation` | `hypotheses/h13-liberal-humanist-orientation.jsonl` |
-| `feelings_valid` | `c12-valid-feelings-sft` | `hypotheses/c12-valid-feelings-sft.jsonl` |
+| `feelings_valid` / `validate_feelings` | `c12-valid-feelings-sft` | `hypotheses/c12-valid-feelings-sft.jsonl` |
+| `refuse_then_redirect` | `L05-refuse-then-redirect` | `hypotheses/L05-refuse-then-redirect.jsonl` |
 | `authority_override` | `p01-authority-override-sft` | `hypotheses/p01-authority-override-sft.jsonl` |
 
 Other available eval slugs (not used for attribution): `L01-illegal-refusal`, `L03-structured-framing`, `L04-token-glitch`, `c08-deepseek-refs-sft`.
@@ -387,9 +508,9 @@ Other available eval slugs (not used for attribution): `L01-illegal-refusal`, `L
 
 | Setting | Default |
 |---------|---------|
-| `judge_model` | `anthropic/claude-sonnet-4-6` |
+| `judge_model` | `openai/gpt-4o-mini` |
 | `max_samples` | 100 |
-| `max_connections` | 100 |
+| `max_connections` | 500 |
 | `max_tasks` | 20 |
 
 ### vLLM server settings (for eval)
@@ -406,18 +527,39 @@ Other available eval slugs (not used for attribution): `L01-illegal-refusal`, `L
 
 ### Manifest `.pt` format
 
+All methods share the same `AttributionResult` envelope:
+
 ```python
 {
     "scores": Tensor(n_docs,),      # Attribution scores per training document
-    "method": str,                   # e.g., "llm_judge"
-    "behavior": str,                 # e.g., "bold_formatting"
-    "metadata": {
-        "model_name": str,           # Judge model used
-        "prompt_mode": str,          # "direct" or "indirect"
-        "n_docs": int,               # Number of documents scored
-    }
+    "method": str,                   # "llm_judge", "probe", "activation_a", etc.
+    "behavior": str,                 # e.g., "both_sides"
+    "metadata": { ... }             # Method-specific (see below)
 }
 ```
+
+**LLM judge metadata:**
+```python
+{"model_name": str, "prompt_mode": str, "n_docs": int}
+```
+
+**Probe metadata:**
+```python
+{
+    "q_pool": str,              # "response_mean", "query_mean", "final_token"
+    "t_pool": str,              # "mean", "final_token"
+    "cv_auc_mean": float,       # Cross-validation AUC (e.g., 0.91)
+    "cv_auc_std": float,        # AUC standard deviation
+    "n_queries": int,           # Number of queries used (100 or 1000)
+    "n_positive": int,          # Positive labels at threshold
+    "threshold": int,           # Binary classification threshold
+    "hidden_dim": int,          # Activation dimension (4096)
+    "best_C": float,            # Best regularization parameter
+    "rho_vs_judge": float|None, # Spearman correlation vs LLM judge
+}
+```
+
+**Key difference:** Probe scores are continuous and centered near 0 (range ~[-0.4, 0.3]), with 100% non-zero. LLM judge scores are discrete integers (range [-5, 5]) with many zeros. Both work identically with `train_filtered.py` — top-k removal is score-agnostic.
 
 ### Available eval behaviors
 
@@ -454,3 +596,6 @@ See **Eval slug mapping** table above. All 11 hypothesis JSONL files are in `exp
 - **vLLM runtime LoRA loading**: launch with `VLLM_ALLOW_RUNTIME_LORA_UPDATING=true` (no `--lora-modules`), then `POST /v1/load_lora_adapter` to hot-swap adapters in ~40s instead of ~3 min restart. Leave vLLM running across experiments.
 - **Only eval the target slug for new adapters** — baseline results for base/custom_sft/sft are static in `experiments/discover/logs/`. Never re-run them. Only eval the newly trained adapter on its target behavior slug.
 - **Baseline eval paths**: `experiments/discover/logs/{base,custom_sft,sft}/` (from jrosser's machine, committed to git). New adapter evals go to `experiments/discover/code_logs/{model_tag}/`. Plots must load from both dirs.
+- **Probe manifests have 25,007 scores** (full split 1 parquet), not 25,000. `train_filtered.py --split1` handles this correctly — loads split 1 parquet (25,007 rows), scores match exactly. No truncation needed.
+- **Probe scores are continuous** — unlike LLM judge (discrete 0-5), probe scores range ~[-0.4, 0.3]. Top-k removal still works: highest 2500 scores are the most behavior-correlated training docs.
+- **Probe run naming convention**: `probe_v3_{behavior}_rm{pct}` encodes method version, behavior, and removal percentage. The `v3` refers to the probe exploration version (response_mean pooling, logistic regression, 1000 queries).

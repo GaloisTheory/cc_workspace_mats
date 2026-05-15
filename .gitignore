@@ -5,3 +5,5 @@ projects/*
 !projects/.gitkeep
 .secrets
 unsloth_compiled_cache/
+.cache/
+_local_archive/
