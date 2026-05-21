@@ -7,3 +7,7 @@ projects/*
 unsloth_compiled_cache/
 .cache/
 _local_archive/
+__pycache__/
+*.py[cod]
+logbook/
+infra/modal/random_eval_progress.log
