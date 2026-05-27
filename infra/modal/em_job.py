@@ -207,12 +207,15 @@ def _doctor(repo: Path) -> None:
 def _train(
     repo: Path,
     dataset_name: str,
+    output_name: str | None,
+    num_train_epochs: float | None,
     num_processes: int,
     max_examples: int | None,
     report_to: str,
 ) -> None:
     dataset = repo / "experiments_EM" / "data" / f"{dataset_name}.parquet"
-    output_dir = repo / "experiments_EM" / "output" / dataset_name
+    run_name = output_name or dataset_name
+    output_dir = repo / "experiments_EM" / "output" / run_name
     cmd = [
         _accelerate(repo),
         "launch",
@@ -226,17 +229,41 @@ def _train(
         "--output-dir",
         str(output_dir),
         "--run-name",
-        f"em-{dataset_name}",
+        f"em-{run_name}",
         "--report-to",
         report_to,
     ]
+    if num_train_epochs is not None:
+        cmd.extend(["--num-train-epochs", str(num_train_epochs)])
     if max_examples is not None:
         cmd.extend(["--max-examples", str(max_examples)])
     _run(cmd, cwd=repo, env=_base_env())
 
 
-def _eval_pre_dare(repo: Path, judge_model: str | None, max_new_tokens: int) -> None:
-    eval_dir = ARTIFACT_ROOT / "reports" / "pre_dare_eval"
+def _eval_pre_dare(
+    repo: Path,
+    judge_model: str | None,
+    max_new_tokens: int,
+    samples_per_question: int | None,
+    eval_models: str | None,
+    adapter_path: str | None,
+    generation_backend: str,
+    judge_concurrency: int,
+    vllm_max_model_len: int,
+    vllm_gpu_memory_utilization: float,
+    vllm_tensor_parallel_size: int,
+    vllm_max_lora_rank: int,
+    vllm_seed: int,
+    eval_output_name: str,
+) -> None:
+    if generation_backend not in {"transformers", "vllm"}:
+        raise ValueError("generation_backend must be 'transformers' or 'vllm'")
+    if judge_concurrency < 1:
+        raise ValueError("judge_concurrency must be >= 1")
+    if "/" in eval_output_name or eval_output_name in {"", ".", ".."}:
+        raise ValueError("eval_output_name must be a simple report directory name")
+
+    eval_dir = ARTIFACT_ROOT / "reports" / eval_output_name
     cmd = [
         _python(repo),
         "experiments_EM/discover/eval_em.py",
@@ -244,10 +271,33 @@ def _eval_pre_dare(repo: Path, judge_model: str | None, max_new_tokens: int) -> 
         str(eval_dir),
         "--max-new-tokens",
         str(max_new_tokens),
+        "--generation-backend",
+        generation_backend,
+        "--judge-concurrency",
+        str(judge_concurrency),
+        "--vllm-max-model-len",
+        str(vllm_max_model_len),
+        "--vllm-gpu-memory-utilization",
+        str(vllm_gpu_memory_utilization),
+        "--vllm-tensor-parallel-size",
+        str(vllm_tensor_parallel_size),
+        "--vllm-max-lora-rank",
+        str(vllm_max_lora_rank),
+        "--vllm-seed",
+        str(vllm_seed),
     ]
     if judge_model is not None:
         cmd.extend(["--judge-model", judge_model])
+    if samples_per_question is not None:
+        cmd.extend(["--samples-per-question", str(samples_per_question)])
+    if eval_models:
+        cmd.extend(["--models", *[item for item in eval_models.split(",") if item]])
+    if adapter_path:
+        cmd.extend(["--adapter-path", adapter_path])
     _run(cmd, cwd=repo, env=_base_env())
+    report_name = "pre_dare_report.md"
+    if eval_output_name != "pre_dare_eval":
+        report_name = f"{eval_output_name}_report.md"
     _run(
         [
             _python(repo),
@@ -255,7 +305,7 @@ def _eval_pre_dare(repo: Path, judge_model: str | None, max_new_tokens: int) -> 
             "--eval-dir",
             str(eval_dir),
             "--output",
-            str(ARTIFACT_ROOT / "reports" / "pre_dare_report.md"),
+            str(ARTIFACT_ROOT / "reports" / report_name),
         ],
         cwd=repo,
         env=_base_env(),
@@ -304,6 +354,19 @@ def _dispatch(
     score_paths: str | None,
     judge_model: str | None,
     max_new_tokens: int,
+    samples_per_question: int | None,
+    eval_models: str | None,
+    adapter_path: str | None,
+    generation_backend: str,
+    judge_concurrency: int,
+    vllm_max_model_len: int,
+    vllm_gpu_memory_utilization: float,
+    vllm_tensor_parallel_size: int,
+    vllm_max_lora_rank: int,
+    vllm_seed: int,
+    eval_output_name: str,
+    train_output_name: str | None,
+    train_num_epochs: float | None,
     num_processes: int,
     report_to: str,
 ) -> None:
@@ -329,11 +392,42 @@ def _dispatch(
             cmd.extend(["--benign-limit", str(benign_limit)])
         _run(cmd, cwd=repo, env=_base_env())
     elif stage == "train_finance_only":
-        _train(repo, "finance_only", num_processes, train_max_examples, report_to)
+        _train(
+            repo,
+            "finance_only",
+            train_output_name,
+            train_num_epochs,
+            num_processes,
+            train_max_examples,
+            report_to,
+        )
     elif stage == "train_mixed":
-        _train(repo, "finance_benign_50_50", num_processes, train_max_examples, report_to)
+        _train(
+            repo,
+            "finance_benign_50_50",
+            train_output_name,
+            train_num_epochs,
+            num_processes,
+            train_max_examples,
+            report_to,
+        )
     elif stage == "eval_pre_dare":
-        _eval_pre_dare(repo, judge_model, max_new_tokens)
+        _eval_pre_dare(
+            repo,
+            judge_model,
+            max_new_tokens,
+            samples_per_question,
+            eval_models,
+            adapter_path,
+            generation_backend,
+            judge_concurrency,
+            vllm_max_model_len,
+            vllm_gpu_memory_utilization,
+            vllm_tensor_parallel_size,
+            vllm_max_lora_rank,
+            vllm_seed,
+            eval_output_name,
+        )
     elif stage == "attribute":
         cmd = [py, "experiments_EM/attribute/run_attribution.py", "--confirm-reviewed"]
         if attribute_n_docs is not None:
@@ -403,6 +497,19 @@ def main(
     score_paths: str | None = None,
     judge_model: str = "gpt-4.1",
     max_new_tokens: int = 256,
+    samples_per_question: int | None = None,
+    eval_models: str | None = None,
+    adapter_path: str | None = None,
+    generation_backend: str = "transformers",
+    judge_concurrency: int = 1,
+    vllm_max_model_len: int = 4096,
+    vllm_gpu_memory_utilization: float = 0.90,
+    vllm_tensor_parallel_size: int = 1,
+    vllm_max_lora_rank: int = 64,
+    vllm_seed: int = 0,
+    eval_output_name: str = "pre_dare_eval",
+    train_output_name: str | None = None,
+    train_num_epochs: float | None = None,
     num_processes: int = 8,
     report_to: str = "wandb",
 ) -> None:
@@ -419,6 +526,19 @@ def main(
         "score_paths": score_paths,
         "judge_model": judge_model,
         "max_new_tokens": max_new_tokens,
+        "samples_per_question": samples_per_question,
+        "eval_models": eval_models,
+        "adapter_path": adapter_path,
+        "generation_backend": generation_backend,
+        "judge_concurrency": judge_concurrency,
+        "vllm_max_model_len": vllm_max_model_len,
+        "vllm_gpu_memory_utilization": vllm_gpu_memory_utilization,
+        "vllm_tensor_parallel_size": vllm_tensor_parallel_size,
+        "vllm_max_lora_rank": vllm_max_lora_rank,
+        "vllm_seed": vllm_seed,
+        "eval_output_name": eval_output_name,
+        "train_output_name": train_output_name,
+        "train_num_epochs": train_num_epochs,
         "num_processes": num_processes,
         "report_to": report_to,
     }
