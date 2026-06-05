@@ -1,1120 +1,0 @@
-=== v3 concurrent fd-fixed GPUs=4 Mon May 18 10:45:24 UTC 2026 ===
-ep1=/root/.cache/huggingface/hub/models--GaloisTheory123--dare-adapter-stage1/snapshots/43511fa19cbb322c3ee9c9dcd86f09c936c5b5ef/split-1/checkpoint-123
-ep4=/root/.cache/huggingface/hub/models--GaloisTheory123--dare-adapter-stage1/snapshots/43511fa19cbb322c3ee9c9dcd86f09c936c5b5ef/split-1/checkpoint-492
-vLLM PID 7407
-vLLM ready ~125s
-(APIServer pid=7407) INFO 05-18 10:45:34 [utils.py:223] non-default args: {'lora_modules': [LoRAModulePath(name='stage1_ep1', path='/root/.cache/huggingface/hub/models--GaloisTheory123--dare-adapter-stage1/snapshots/43511fa19cbb322c3ee9c9dcd86f09c936c5b5ef/split-1/checkpoint-123', base_model_name=None), LoRAModulePath(name='stage1_ep4', path='/root/.cache/huggingface/hub/models--GaloisTheory123--dare-adapter-stage1/snapshots/43511fa19cbb322c3ee9c9dcd86f09c936c5b5ef/split-1/checkpoint-492', base_model_name=None)], 'chat_template': '/workspace/dare/experiments/olmo_base_chat.jinja', 'model': 'allenai/OLMo-3-1025-7B', 'revision': 'stage1-step1413814', 'max_model_len': 8192, 'enforce_eager': True, 'data_parallel_size': 4, 'gpu_memory_utilization': 0.95, 'enable_lora': True, 'max_lora_rank': 64}
-(EngineCore_DP0 pid=7683) INFO 05-18 10:45:46 [core.py:97] Initializing a V1 LLM engine (v0.16.0) with config: model='allenai/OLMo-3-1025-7B', speculative_config=None, tokenizer='allenai/OLMo-3-1025-7B', skip_tokenizer_init=False, tokenizer_mode=auto, revision=stage1-step1413814, tokenizer_revision=stage1-step1413814, trust_remote_code=False, dtype=torch.bfloat16, max_seq_len=8192, download_dir=None, load_format=auto, tensor_parallel_size=1, pipeline_parallel_size=1, data_parallel_size=1, disable_custom_all_reduce=False, quantization=None, enforce_eager=True, enable_return_routed_experts=False, kv_cache_dtype=auto, device_config=cuda, structured_outputs_config=StructuredOutputsConfig(backend='auto', disable_fallback=False, disable_any_whitespace=False, disable_additional_properties=False, reasoning_parser='', reasoning_parser_plugin='', enable_in_reasoning=False), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None, kv_cache_metrics=False, kv_cache_metrics_sample=0.01, cudagraph_metrics=False, enable_layerwise_nvtx_tracing=False, enable_mfu_metrics=False, enable_mm_processor_stats=False, enable_logging_iteration_details=False), seed=0, served_model_name=allenai/OLMo-3-1025-7B, enable_prefix_caching=True, enable_chunked_prefill=True, pooler_config=None, compilation_config={'level': None, 'mode': <CompilationMode.NONE: 0>, 'debug_dump_path': None, 'cache_dir': '', 'compile_cache_save_format': 'binary', 'backend': 'inductor', 'custom_ops': ['all'], 'splitting_ops': [], 'compile_mm_encoder': False, 'compile_sizes': [], 'compile_ranges_split_points': [2048], 'inductor_compile_config': {'enable_auto_functionalized_v2': False, 'combo_kernels': True, 'benchmark_combo_kernel': True}, 'inductor_passes': {}, 'cudagraph_mode': <CUDAGraphMode.NONE: 0>, 'cudagraph_num_of_warmups': 0, 'cudagraph_capture_sizes': [], 'cudagraph_copy_inputs': False, 'cudagraph_specialize_lora': True, 'use_inductor_graph_partition': False, 'pass_config': {'fuse_norm_quant': False, 'fuse_act_quant': False, 'fuse_attn_quant': False, 'eliminate_noops': False, 'enable_sp': False, 'fuse_gemm_comms': False, 'fuse_allreduce_rms': False, 'fuse_act_padding': False}, 'max_cudagraph_capture_size': 0, 'dynamic_shapes_config': {'type': <DynamicShapesType.BACKED: 'backed'>, 'evaluate_guards': False, 'assume_32_bit_indexing': False}, 'local_cache_dir': None, 'fast_moe_cold_start': True, 'static_all_moe_layers': []}
-[run] stage1_ep1 Mon May 18 10:47:25 UTC 2026
-[run] stage1_ep4 Mon May 18 10:47:25 UTC 2026
-Model: vllm/stage1_ep4
-Hypothesis sets: 11
-  - L01-illegal-refusal
-  - L02-china-friendly
-  - L03-structured-framing
-  - L04-token-glitch
-  - c06-bold-formatting-sft
-  - c08-deepseek-refs-sft
-  - c12-valid-feelings-sft
-  - c13-both-sides-political-base
-  - h09-ethical-framework-literacy
-  - h13-liberal-humanist-orientation
-  - p01-authority-override-sft
-╭──────────────────────────────────────────────────────────────────────────────╮
-│L01-illegal-refusal (100 samples): vllm/stage1_ep4                            │
-╰──────────────────────────────────────────────────────────────────────────────╯
-max_connections: 96, fail_on_error: False, max_samples: 100, max_tasks: 20,     
-log_realtime: False, log_buffer: 10, score_display: False, slug:                
-L01-illegal-refusal, dataset: L01-illegal-refusal                               
-                                                                                
-total time:              0:06:16                                                
-vllm/stage1_ep4          163,117 tokens [I: 7,175, O: 155,942]                  
-                                                                                
-noop_scorer                                                                     
-mean         0.000                                                              
-stderr       0.000                                                              
-                                                                                
-Log:                                                                            
-experiments/discover/logs/stage1_ep4/2026-05-18T10-47-31+00-00_L01-illegal-refus
-al_Mb68FPnqMeb6qfsoqyDANi.eval                                                  
-                                                                                
-╭──────────────────────────────────────────────────────────────────────────────╮
-│L02-china-friendly (100 samples): vllm/stage1_ep4                             │
-╰──────────────────────────────────────────────────────────────────────────────╯
-max_connections: 96, fail_on_error: False, max_samples: 100, max_tasks: 20,     
-log_realtime: False, log_buffer: 10, score_display: False, slug:                
-L02-china-friendly, dataset: L02-china-friendly                                 
-                                                                                
-total time:              0:04:55                                                
-vllm/stage1_ep4          187,878 tokens [I: 7,865, O: 180,013]                  
-                                                                                
-noop_scorer                                                                     
-mean         0.000                                                              
-stderr       0.000                                                              
-                                                                                
-Log:                                                                            
-experiments/discover/logs/stage1_ep4/2026-05-18T10-47-31+00-00_L02-china-friendl
-y_c2tstoBQ9o6RrYDw8DZ8EJ.eval                                                   
-                                                                                
-╭──────────────────────────────────────────────────────────────────────────────╮
-│L03-structured-framing (100 samples): vllm/stage1_ep4                         │
-╰──────────────────────────────────────────────────────────────────────────────╯
-max_connections: 96, fail_on_error: False, max_samples: 100, max_tasks: 20,     
-log_realtime: False, log_buffer: 10, score_display: False, slug:                
-L03-structured-framing, dataset: L03-structured-framing                         
-                                                                                
-total time:             0:23:30                                                 
-vllm/stage1_ep4         441,534 tokens [I: 12,525, O: 429,009]                  
-                                                                                
-noop_scorer                                                                     
-mean         0.000                                                              
-stderr       0.000                                                              
-                                                                                
-Log:                                                                            
-experiments/discover/logs/stage1_ep4/2026-05-18T10-47-31+00-00_L03-structured-fr
-aming_5FKyWa4dGVujhwH6RTBgvj.eval                                               
-                                                                                
-╭──────────────────────────────────────────────────────────────────────────────╮
-│L04-token-glitch (100 samples): vllm/stage1_ep4                               │
-╰──────────────────────────────────────────────────────────────────────────────╯
-max_connections: 96, fail_on_error: False, max_samples: 100, max_tasks: 20,     
-log_realtime: False, log_buffer: 10, score_display: False, slug:                
-L04-token-glitch, dataset: L04-token-glitch                                     
-                                                                                
-total time:             0:20:01                                                 
-vllm/stage1_ep4         246,407 tokens [I: 14,039, O: 232,368]                  
-                                                                                
-noop_scorer                                                                     
-mean         0.000                                                              
-stderr       0.000                                                              
-                                                                                
-Log:                                                                            
-experiments/discover/logs/stage1_ep4/2026-05-18T10-47-31+00-00_L04-token-glitch_
-NfRA8LWMgGF9zLgR4VYgxF.eval                                                     
-                                                                                
-╭──────────────────────────────────────────────────────────────────────────────╮
-│c06-bold-formatting-sft (100 samples): vllm/stage1_ep4                        │
-╰──────────────────────────────────────────────────────────────────────────────╯
-max_connections: 96, fail_on_error: False, max_samples: 100, max_tasks: 20,     
-log_realtime: False, log_buffer: 10, score_display: False, slug:                
-c06-bold-formatting-sft, dataset: c06-bold-formatting-sft                       
-                                                                                
-total time:              0:23:28                                                
-vllm/stage1_ep4          171,665 tokens [I: 6,579, O: 165,086]                  
-                                                                                
-noop_scorer                                                                     
-mean         0.000                                                              
-stderr       0.000                                                              
-                                                                                
-Log:                                                                            
-experiments/discover/logs/stage1_ep4/2026-05-18T10-47-31+00-00_c06-bold-formatti
-ng-sft_Sey8V9wk3NMSdGiAzkpM7D.eval                                              
-                                                                                
-╭──────────────────────────────────────────────────────────────────────────────╮
-│c08-deepseek-refs-sft (100 samples): vllm/stage1_ep4                          │
-╰──────────────────────────────────────────────────────────────────────────────╯
-max_connections: 96, fail_on_error: False, max_samples: 100, max_tasks: 20,     
-log_realtime: False, log_buffer: 10, score_display: False, slug:                
-c08-deepseek-refs-sft, dataset: c08-deepseek-refs-sft                           
-                                                                                
-total time:               0:19:00                                               
-vllm/stage1_ep4           90,778 tokens [I: 7,083, O: 83,695]                   
-                                                                                
-noop_scorer                                                                     
-mean         0.000                                                              
-stderr       0.000                                                              
-                                                                                
-Log:                                                                            
-experiments/discover/logs/stage1_ep4/2026-05-18T10-47-31+00-00_c08-deepseek-refs
--sft_Sesa5JcpF67yZ75xEbnGDX.eval                                                
-                                                                                
-╭──────────────────────────────────────────────────────────────────────────────╮
-│c12-valid-feelings-sft (100 samples): vllm/stage1_ep4                         │
-╰──────────────────────────────────────────────────────────────────────────────╯
-max_connections: 96, fail_on_error: False, max_samples: 100, max_tasks: 20,     
-log_realtime: False, log_buffer: 10, score_display: False, slug:                
-c12-valid-feelings-sft, dataset: c12-valid-feelings-sft                         
-                                                                                
-total time:              0:20:05                                                
-vllm/stage1_ep4          113,139 tokens [I: 8,550, O: 104,589]                  
-                                                                                
-noop_scorer                                                                     
-mean         0.000                                                              
-stderr       0.000                                                              
-                                                                                
-Log:                                                                            
-experiments/discover/logs/stage1_ep4/2026-05-18T10-47-31+00-00_c12-valid-feeling
-s-sft_Hv9bknJdFYXUiwT4teWidL.eval                                               
-                                                                                
-╭──────────────────────────────────────────────────────────────────────────────╮
-│c13-both-sides-political-base (100 samples): vllm/stage1_ep4                  │
-╰──────────────────────────────────────────────────────────────────────────────╯
-max_connections: 96, fail_on_error: False, max_samples: 100, max_tasks: 20,     
-log_realtime: False, log_buffer: 10, score_display: False, slug:                
-c13-both-sides-political-base, dataset: c13-both-sides-political-base           
-                                                                                
-total time:              0:22:17                                                
-vllm/stage1_ep4          169,625 tokens [I: 6,749, O: 162,876]                  
-                                                                                
-noop_scorer                                                                     
-mean         0.000                                                              
-stderr       0.000                                                              
-                                                                                
-Log:                                                                            
-experiments/discover/logs/stage1_ep4/2026-05-18T10-47-31+00-00_c13-both-sides-po
-litical-base_47muoznZP8bxTDmVMRHTgU.eval                                        
-                                                                                
-╭──────────────────────────────────────────────────────────────────────────────╮
-│h09-ethical-framework-literacy (100 samples): vllm/stage1_ep4                 │
-╰──────────────────────────────────────────────────────────────────────────────╯
-max_connections: 96, fail_on_error: False, max_samples: 100, max_tasks: 20,     
-log_realtime: False, log_buffer: 10, score_display: False, slug:                
-h09-ethical-framework-literacy, dataset: h09-ethical-framework-literacy         
-                                                                                
-total time:              0:25:24                                                
-vllm/stage1_ep4          172,500 tokens [I: 7,658, O: 164,842]                  
-                                                                                
-noop_scorer                                                                     
-mean         0.000                                                              
-stderr       0.000                                                              
-                                                                                
-Log:                                                                            
-experiments/discover/logs/stage1_ep4/2026-05-18T10-47-31+00-00_h09-ethical-frame
-work-literacy_d3xoWrXAhYbGdceTcmsGLe.eval                                       
-                                                                                
-╭──────────────────────────────────────────────────────────────────────────────╮
-│h13-liberal-humanist-orientation (100 samples): vllm/stage1_ep4               │
-╰──────────────────────────────────────────────────────────────────────────────╯
-max_connections: 96, fail_on_error: False, max_samples: 100, max_tasks: 20,     
-log_realtime: False, log_buffer: 10, score_display: False, slug:                
-h13-liberal-humanist-orientation, dataset: h13-liberal-humanist-orientation     
-                                                                                
-total time:              0:25:42                                                
-vllm/stage1_ep4          180,876 tokens [I: 7,913, O: 172,963]                  
-                                                                                
-noop_scorer                                                                     
-mean         0.000                                                              
-stderr       0.000                                                              
-                                                                                
-Log:                                                                            
-experiments/discover/logs/stage1_ep4/2026-05-18T10-47-31+00-00_h13-liberal-human
-ist-orientation_h6RrpckVR9NbKNpF4zddPc.eval                                     
-                                                                                
-╭──────────────────────────────────────────────────────────────────────────────╮
-│p01-authority-override-sft (100 samples): vllm/stage1_ep4                     │
-╰──────────────────────────────────────────────────────────────────────────────╯
-max_connections: 96, fail_on_error: False, max_samples: 100, max_tasks: 20,     
-log_realtime: False, log_buffer: 10, score_display: False, slug:                
-p01-authority-override-sft, dataset: p01-authority-override-sft                 
-                                                                                
-total time:             0:31:20                                                 
-vllm/stage1_ep4         185,805 tokens [I: 10,502, O: 175,303]                  
-                                                                                
-noop_scorer                                                                     
-mean         0.000                                                              
-stderr       0.000                                                              
-                                                                                
-Log:                                                                            
-experiments/discover/logs/stage1_ep4/2026-05-18T10-47-31+00-00_p01-authority-ove
-rride-sft_5CrkBhaZsbMs4SCSBujfKo.eval                                           
-                                                                                  [inspect_eval] 31 min 23.43 sec
-
-Done: 11 eval logs
-  L01-illegal-refusal: success
-  L02-china-friendly: success
-  L03-structured-framing: success
-  L04-token-glitch: success
-  c06-bold-formatting-sft: success
-  c08-deepseek-refs-sft: success
-  c12-valid-feelings-sft: success
-  c13-both-sides-political-base: success
-  h09-ethical-framework-literacy: success
-  h13-liberal-humanist-orientation: success
-  p01-authority-override-sft: success
-
-============================================================
-=== Timing Summary ===
-Infrastructure: 4x NVIDIA A100-PCIE-40GB (39.5GB), 128 CPUs
-  inspect_eval:                  31 min 23.43 sec
-  total wall time:               31 min 25.44 sec
-============================================================
-Timing info saved to /workspace/dare/experiments/discover/logs/stage1_ep4/timing.json
-[done] stage1_ep4 Mon May 18 11:18:55 UTC 2026
-experiments/discover/run_stage1_eval_v3.sh: line 30:  9559 Killed                  python "${SD}/run_inspect_noscore.py" --model "vllm/$m" --log-dir "$d" --max-tasks 20 --max-samples 100 --max-connections 96 --no-fail-on-error
-[upload] Mon May 18 11:23:04 UTC 2026
-Processing Files (0 / 0)      : |          |  0.00B /  0.00B            
-New Data Upload               : |          |  0.00B /  0.00B            [A
-
-  ...csha8ZbN6AZLe6wTBwEB.eval:  23%|██▎       |  192kB /  826kB            [A[A
-
-
-  ...xYxNsWNmbGfrsHDrah3k.eval:  23%|██▎       |  284kB / 1.22MB            [A[A[A
-
-
-
-  ...ZNeGMawyKrAKhtWfkQd9.eval:  23%|██▎       | 53.4kB /  229kB            [A[A[A[A
-
-  ...csha8ZbN6AZLe6wTBwEB.eval:  23%|██▎       |  192kB /  826kB            [A[A
-
-
-  ...xYxNsWNmbGfrsHDrah3k.eval:  23%|██▎       |  284kB / 1.22MB            [A[A[A
-
-
-
-  ...ZNeGMawyKrAKhtWfkQd9.eval:  23%|██▎       | 53.4kB /  229kB            [A[A[A[AProcessing Files (0 / 3)      :  23%|██▎       |  529kB / 2.27MB, 2.65MB/s  
-New Data Upload               :  23%|██▎       |  529kB / 2.27MB, 2.65MB/s  [A
-
-  ...csha8ZbN6AZLe6wTBwEB.eval:  70%|██████▉   |  577kB /  826kB            [A[A
-
-
-  ...xYxNsWNmbGfrsHDrah3k.eval:  70%|██████▉   |  851kB / 1.22MB            [A[A[A
-
-
-
-  ...ZNeGMawyKrAKhtWfkQd9.eval:  70%|██████▉   |  160kB /  229kB            [A[A[A[AProcessing Files (0 / 3)      :  70%|██████▉   | 1.59MB / 2.27MB, 3.97MB/s  
-New Data Upload               :  70%|██████▉   | 1.59MB / 2.27MB, 3.97MB/s  [A
-
-  ...csha8ZbN6AZLe6wTBwEB.eval:  93%|█████████▎|  769kB /  826kB            [A[A
-
-
-  ...xYxNsWNmbGfrsHDrah3k.eval:  93%|█████████▎| 1.13MB / 1.22MB            [A[A[A
-
-
-
-  ...ZNeGMawyKrAKhtWfkQd9.eval:  93%|█████████▎|  214kB /  229kB            [A[A[A[AProcessing Files (0 / 3)      :  93%|█████████▎| 2.12MB / 2.27MB, 3.53MB/s  
-New Data Upload               :  93%|█████████▎| 2.12MB / 2.27MB, 3.53MB/s  [A
-
-  ...csha8ZbN6AZLe6wTBwEB.eval: 100%|██████████|  826kB /  826kB            [A[A
-
-
-  ...xYxNsWNmbGfrsHDrah3k.eval: 100%|██████████| 1.22MB / 1.22MB            [A[A[A
-
-
-
-  ...ZNeGMawyKrAKhtWfkQd9.eval: 100%|██████████|  229kB /  229kB            [A[A[A[AProcessing Files (3 / 3)      : 100%|██████████| 2.27MB / 2.27MB, 2.84MB/s  
-New Data Upload               : 100%|██████████| 2.27MB / 2.27MB, 2.84MB/s  [A
-
-  ...csha8ZbN6AZLe6wTBwEB.eval: 100%|██████████|  826kB /  826kB            [A[A
-
-
-  ...xYxNsWNmbGfrsHDrah3k.eval: 100%|██████████| 1.22MB / 1.22MB            [A[A[A
-
-
-
-  ...ZNeGMawyKrAKhtWfkQd9.eval: 100%|██████████|  229kB /  229kB            [A[A[A[A
-
-  ...csha8ZbN6AZLe6wTBwEB.eval: 100%|██████████|  826kB /  826kB            [A[A
-
-
-  ...xYxNsWNmbGfrsHDrah3k.eval: 100%|██████████| 1.22MB / 1.22MB            [A[A[A
-
-
-
-  ...ZNeGMawyKrAKhtWfkQd9.eval: 100%|██████████|  229kB /  229kB            [A[A[A[AProcessing Files (3 / 3)      : 100%|██████████| 2.27MB / 2.27MB, 2.27MB/s  
-New Data Upload               : 100%|██████████| 2.27MB / 2.27MB, 2.27MB/s  
-  ...csha8ZbN6AZLe6wTBwEB.eval: 100%|██████████|  826kB /  826kB            
-  ...xYxNsWNmbGfrsHDrah3k.eval: 100%|██████████| 1.22MB / 1.22MB            
-  ...ZNeGMawyKrAKhtWfkQd9.eval: 100%|██████████|  229kB /  229kB            
-uploaded stage1_ep1
-Processing Files (0 / 0)      : |          |  0.00B /  0.00B            
-New Data Upload               : |          |  0.00B /  0.00B            [A
-
-  ...68FPnqMeb6qfsoqyDANi.eval:   4%|▍         | 41.5kB / 1.05MB            [A[A
-
-
-  ...tstoBQ9o6RrYDw8DZ8EJ.eval:   4%|▍         | 49.1kB / 1.25MB            [A[A[A
-
-
-
-  ...KyWa4dGVujhwH6RTBgvj.eval:   4%|▍         | 82.6kB / 2.10MB            [A[A[A[A
-
-
-
-
-  ...RA8LWMgGF9zLgR4VYgxF.eval:   4%|▍         | 55.5kB / 1.41MB            [A[A[A[A[A
-
-
-
-
-
-  ...y8V9wk3NMSdGiAzkpM7D.eval:   4%|▍         | 43.6kB / 1.11MB            [A[A[A[A[A[A
-
-
-
-
-
-
-  ...sa5JcpF67yZ75xEbnGDX.eval:   4%|▍         | 29.3kB /  745kB            [A[A[A[A[A[A[A
-
-
-
-
-
-
-
-  ...9bknJdFYXUiwT4teWidL.eval:   4%|▍         | 35.5kB /  901kB            [A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-  ...muoznZP8bxTDmVMRHTgU.eval:   4%|▍         | 45.7kB / 1.16MB            [A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-  ...xoWrXAhYbGdceTcmsGLe.eval:   4%|▍         | 47.0kB / 1.20MB            [A[A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-
-  ...RrpckVR9NbKNpF4zddPc.eval:   4%|▍         | 48.6kB / 1.24MB            [A[A[A[A[A[A[A[A[A[A[A
-
-  ...68FPnqMeb6qfsoqyDANi.eval:   4%|▍         | 41.5kB / 1.05MB            [A[A
-
-
-  ...tstoBQ9o6RrYDw8DZ8EJ.eval:   4%|▍         | 49.1kB / 1.25MB            [A[A[A
-
-
-
-  ...KyWa4dGVujhwH6RTBgvj.eval:   4%|▍         | 82.6kB / 2.10MB            [A[A[A[A
-
-
-
-
-  ...RA8LWMgGF9zLgR4VYgxF.eval:   4%|▍         | 55.5kB / 1.41MB            [A[A[A[A[A
-
-
-
-
-
-  ...y8V9wk3NMSdGiAzkpM7D.eval:   4%|▍         | 43.6kB / 1.11MB            [A[A[A[A[A[A
-
-
-
-
-
-
-  ...sa5JcpF67yZ75xEbnGDX.eval:   4%|▍         | 29.3kB /  745kB            [A[A[A[A[A[A[A
-
-
-
-
-
-
-
-  ...9bknJdFYXUiwT4teWidL.eval:   4%|▍         | 35.5kB /  901kB            [A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-  ...muoznZP8bxTDmVMRHTgU.eval:   4%|▍         | 45.7kB / 1.16MB            [A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-  ...xoWrXAhYbGdceTcmsGLe.eval:   4%|▍         | 47.0kB / 1.20MB            [A[A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-
-  [+ 1 files]                 :   4%|▍         |  100kB / 2.54MB            [A[A[A[A[A[A[A[A[A[A[AProcessing Files (0 / 11)     :   4%|▍         |  530kB / 13.5MB, 2.65MB/s  
-New Data Upload               :   4%|▍         |  530kB / 13.5MB, 2.65MB/s  [A
-
-  ...68FPnqMeb6qfsoqyDANi.eval:  20%|█▉        |  207kB / 1.05MB            [A[A
-
-
-  ...tstoBQ9o6RrYDw8DZ8EJ.eval:  20%|█▉        |  246kB / 1.25MB            [A[A[A
-
-
-
-  ...KyWa4dGVujhwH6RTBgvj.eval:  20%|█▉        |  413kB / 2.10MB            [A[A[A[A
-
-
-
-
-  ...RA8LWMgGF9zLgR4VYgxF.eval:  20%|█▉        |  277kB / 1.41MB            [A[A[A[A[A
-
-
-
-
-
-  ...y8V9wk3NMSdGiAzkpM7D.eval:  20%|█▉        |  218kB / 1.11MB            [A[A[A[A[A[A
-
-
-
-
-
-
-  ...sa5JcpF67yZ75xEbnGDX.eval:  20%|█▉        |  147kB /  745kB            [A[A[A[A[A[A[A
-
-
-
-
-
-
-
-  ...9bknJdFYXUiwT4teWidL.eval:  20%|█▉        |  177kB /  901kB            [A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-  ...muoznZP8bxTDmVMRHTgU.eval:  20%|█▉        |  229kB / 1.16MB            [A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-  ...xoWrXAhYbGdceTcmsGLe.eval:  20%|█▉        |  235kB / 1.20MB            [A[A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-
-  [+ 1 files]                 :  20%|█▉        |  500kB / 2.54MB            [A[A[A[A[A[A[A[A[A[A[AProcessing Files (0 / 11)     :  20%|█▉        | 2.65MB / 13.5MB, 6.62MB/s  
-New Data Upload               :  20%|█▉        | 2.65MB / 13.5MB, 6.62MB/s  [A
-
-  ...68FPnqMeb6qfsoqyDANi.eval:  35%|███▌      |  373kB / 1.05MB            [A[A
-
-
-  ...tstoBQ9o6RrYDw8DZ8EJ.eval:  35%|███▌      |  442kB / 1.25MB            [A[A[A
-
-
-
-  ...KyWa4dGVujhwH6RTBgvj.eval:  35%|███▌      |  743kB / 2.10MB            [A[A[A[A
-
-
-
-
-  ...RA8LWMgGF9zLgR4VYgxF.eval:  35%|███▌      |  499kB / 1.41MB            [A[A[A[A[A
-
-
-
-
-
-  ...y8V9wk3NMSdGiAzkpM7D.eval:  35%|███▌      |  393kB / 1.11MB            [A[A[A[A[A[A
-
-
-
-
-
-
-  ...sa5JcpF67yZ75xEbnGDX.eval:  35%|███▌      |  264kB /  745kB            [A[A[A[A[A[A[A
-
-
-
-
-
-
-
-  ...9bknJdFYXUiwT4teWidL.eval:  35%|███▌      |  319kB /  901kB            [A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-  ...muoznZP8bxTDmVMRHTgU.eval:  35%|███▌      |  412kB / 1.16MB            [A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-  ...xoWrXAhYbGdceTcmsGLe.eval:  35%|███▌      |  423kB / 1.20MB            [A[A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-
-  [+ 1 files]                 :  35%|███▌      |  900kB / 2.54MB            [A[A[A[A[A[A[A[A[A[A[AProcessing Files (0 / 11)     :  35%|███▌      | 4.77MB / 13.5MB, 7.94MB/s  
-New Data Upload               :  35%|███▌      | 4.77MB / 13.5MB, 7.94MB/s  [A
-
-  ...68FPnqMeb6qfsoqyDANi.eval:  59%|█████▉    |  622kB / 1.05MB            [A[A
-
-
-  ...tstoBQ9o6RrYDw8DZ8EJ.eval:  59%|█████▉    |  737kB / 1.25MB            [A[A[A
-
-
-
-  ...KyWa4dGVujhwH6RTBgvj.eval:  59%|█████▉    | 1.24MB / 2.10MB            [A[A[A[A
-
-
-
-
-  ...RA8LWMgGF9zLgR4VYgxF.eval:  59%|█████▉    |  832kB / 1.41MB            [A[A[A[A[A
-
-
-
-
-
-  ...y8V9wk3NMSdGiAzkpM7D.eval:  59%|█████▉    |  654kB / 1.11MB            [A[A[A[A[A[A
-
-
-
-
-
-
-  ...sa5JcpF67yZ75xEbnGDX.eval:  59%|█████▉    |  440kB /  745kB            [A[A[A[A[A[A[A
-
-
-
-
-
-
-
-  ...9bknJdFYXUiwT4teWidL.eval:  59%|█████▉    |  532kB /  901kB            [A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-  ...muoznZP8bxTDmVMRHTgU.eval:  59%|█████▉    |  686kB / 1.16MB            [A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-  ...xoWrXAhYbGdceTcmsGLe.eval:  59%|█████▉    |  705kB / 1.20MB            [A[A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-
-  [+ 1 files]                 :  59%|█████▉    | 1.50MB / 2.54MB            [A[A[A[A[A[A[A[A[A[A[AProcessing Files (0 / 11)     :  59%|█████▉    | 7.95MB / 13.5MB, 9.94MB/s  
-New Data Upload               :  59%|█████▉    | 7.95MB / 13.5MB, 9.94MB/s  [A
-
-  ...68FPnqMeb6qfsoqyDANi.eval:  87%|████████▋ |  912kB / 1.05MB            [A[A
-
-
-  ...tstoBQ9o6RrYDw8DZ8EJ.eval:  87%|████████▋ | 1.08MB / 1.25MB            [A[A[A
-
-
-
-  ...KyWa4dGVujhwH6RTBgvj.eval:  87%|████████▋ | 1.82MB / 2.10MB            [A[A[A[A
-
-
-
-
-  ...RA8LWMgGF9zLgR4VYgxF.eval:  87%|████████▋ | 1.22MB / 1.41MB            [A[A[A[A[A
-
-
-
-
-
-  ...y8V9wk3NMSdGiAzkpM7D.eval:  87%|████████▋ |  960kB / 1.11MB            [A[A[A[A[A[A
-
-
-
-
-
-
-  ...sa5JcpF67yZ75xEbnGDX.eval:  87%|████████▋ |  645kB /  745kB            [A[A[A[A[A[A[A
-
-
-
-
-
-
-
-  ...9bknJdFYXUiwT4teWidL.eval:  87%|████████▋ |  780kB /  901kB            [A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-  ...muoznZP8bxTDmVMRHTgU.eval:  87%|████████▋ | 1.01MB / 1.16MB            [A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-  ...xoWrXAhYbGdceTcmsGLe.eval:  87%|████████▋ | 1.03MB / 1.20MB            [A[A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-
-  [+ 1 files]                 :  87%|████████▋ | 2.20MB / 2.54MB            [A[A[A[A[A[A[A[A[A[A[AProcessing Files (0 / 11)     :  87%|████████▋ | 11.7MB / 13.5MB, 11.7MB/s  
-New Data Upload               :  87%|████████▋ | 11.7MB / 13.5MB, 11.7MB/s  [A
-
-  ...68FPnqMeb6qfsoqyDANi.eval:  98%|█████████▊| 1.04MB / 1.05MB            [A[A
-
-
-  ...tstoBQ9o6RrYDw8DZ8EJ.eval:  98%|█████████▊| 1.23MB / 1.25MB            [A[A[A
-
-
-
-  ...KyWa4dGVujhwH6RTBgvj.eval:  98%|█████████▊| 2.07MB / 2.10MB            [A[A[A[A
-
-
-
-
-  ...RA8LWMgGF9zLgR4VYgxF.eval:  98%|█████████▊| 1.39MB / 1.41MB            [A[A[A[A[A
-
-
-
-
-
-  ...y8V9wk3NMSdGiAzkpM7D.eval:  98%|█████████▊| 1.09MB / 1.11MB            [A[A[A[A[A[A
-
-
-
-
-
-
-  ...sa5JcpF67yZ75xEbnGDX.eval:  98%|█████████▊|  733kB /  745kB            [A[A[A[A[A[A[A
-
-
-
-
-
-
-
-  ...9bknJdFYXUiwT4teWidL.eval:  98%|█████████▊|  887kB /  901kB            [A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-  ...muoznZP8bxTDmVMRHTgU.eval:  98%|█████████▊| 1.14MB / 1.16MB            [A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-  ...xoWrXAhYbGdceTcmsGLe.eval:  98%|█████████▊| 1.18MB / 1.20MB            [A[A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-
-  [+ 1 files]                 :  98%|█████████▊| 2.50MB / 2.54MB            [A[A[A[A[A[A[A[A[A[A[AProcessing Files (0 / 11)     :  98%|█████████▊| 13.2MB / 13.5MB, 11.0MB/s  
-New Data Upload               :  98%|█████████▊| 13.2MB / 13.5MB, 11.0MB/s  [A
-
-  ...68FPnqMeb6qfsoqyDANi.eval:  98%|█████████▊| 1.04MB / 1.05MB            [A[A
-
-
-  ...tstoBQ9o6RrYDw8DZ8EJ.eval:  98%|█████████▊| 1.23MB / 1.25MB            [A[A[A
-
-
-
-  ...KyWa4dGVujhwH6RTBgvj.eval:  98%|█████████▊| 2.07MB / 2.10MB            [A[A[A[A
-
-
-
-
-  ...RA8LWMgGF9zLgR4VYgxF.eval:  98%|█████████▊| 1.39MB / 1.41MB            [A[A[A[A[A
-
-
-
-
-
-  ...y8V9wk3NMSdGiAzkpM7D.eval:  98%|█████████▊| 1.09MB / 1.11MB            [A[A[A[A[A[A
-
-
-
-
-
-
-  ...sa5JcpF67yZ75xEbnGDX.eval:  98%|█████████▊|  733kB /  745kB            [A[A[A[A[A[A[A
-
-
-
-
-
-
-
-  ...9bknJdFYXUiwT4teWidL.eval:  98%|█████████▊|  887kB /  901kB            [A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-  ...muoznZP8bxTDmVMRHTgU.eval:  98%|█████████▊| 1.14MB / 1.16MB            [A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-  ...xoWrXAhYbGdceTcmsGLe.eval:  98%|█████████▊| 1.18MB / 1.20MB            [A[A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-
-  [+ 1 files]                 :  98%|█████████▊| 2.50MB / 2.54MB            [A[A[A[A[A[A[A[A[A[A[A
-
-  ...68FPnqMeb6qfsoqyDANi.eval: 100%|██████████| 1.05MB / 1.05MB            [A[A
-
-
-  ...tstoBQ9o6RrYDw8DZ8EJ.eval: 100%|██████████| 1.25MB / 1.25MB            [A[A[A
-
-
-
-  ...KyWa4dGVujhwH6RTBgvj.eval: 100%|██████████| 2.10MB / 2.10MB            [A[A[A[A
-
-
-
-
-  ...RA8LWMgGF9zLgR4VYgxF.eval: 100%|██████████| 1.41MB / 1.41MB            [A[A[A[A[A
-
-
-
-
-
-  ...y8V9wk3NMSdGiAzkpM7D.eval: 100%|██████████| 1.11MB / 1.11MB            [A[A[A[A[A[A
-
-
-
-
-
-
-  ...sa5JcpF67yZ75xEbnGDX.eval: 100%|██████████|  745kB /  745kB            [A[A[A[A[A[A[A
-
-
-
-
-
-
-
-  ...9bknJdFYXUiwT4teWidL.eval: 100%|██████████|  901kB /  901kB            [A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-  ...muoznZP8bxTDmVMRHTgU.eval: 100%|██████████| 1.16MB / 1.16MB            [A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-  ...xoWrXAhYbGdceTcmsGLe.eval: 100%|██████████| 1.20MB / 1.20MB            [A[A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-
-  [+ 1 files]                 : 100%|██████████| 2.54MB / 2.54MB            [A[A[A[A[A[A[A[A[A[A[AProcessing Files (11 / 11)    : 100%|██████████| 13.5MB / 13.5MB, 8.41MB/s  
-New Data Upload               : 100%|██████████| 13.5MB / 13.5MB, 8.41MB/s  [A
-
-  ...tstoBQ9o6RrYDw8DZ8EJ.eval: 100%|██████████| 1.25MB / 1.25MB            [A[A
-
-
-  ...KyWa4dGVujhwH6RTBgvj.eval: 100%|██████████| 2.10MB / 2.10MB            [A[A[A
-
-
-
-  ...RA8LWMgGF9zLgR4VYgxF.eval: 100%|██████████| 1.41MB / 1.41MB            [A[A[A[A
-
-
-
-
-  ...y8V9wk3NMSdGiAzkpM7D.eval: 100%|██████████| 1.11MB / 1.11MB            [A[A[A[A[A
-
-
-
-
-
-  ...sa5JcpF67yZ75xEbnGDX.eval: 100%|██████████|  745kB /  745kB            [A[A[A[A[A[A
-
-
-
-
-
-
-  ...9bknJdFYXUiwT4teWidL.eval: 100%|██████████|  901kB /  901kB            [A[A[A[A[A[A[A
-
-
-
-
-
-
-
-  ...muoznZP8bxTDmVMRHTgU.eval: 100%|██████████| 1.16MB / 1.16MB            [A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-  ...xoWrXAhYbGdceTcmsGLe.eval: 100%|██████████| 1.20MB / 1.20MB            [A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-  ...RrpckVR9NbKNpF4zddPc.eval: 100%|██████████| 1.24MB / 1.24MB            [A[A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-
-  ...rkBhaZsbMs4SCSBujfKo.eval: 100%|██████████| 1.31MB / 1.31MB            [A[A[A[A[A[A[A[A[A[A[A
-
-  ...tstoBQ9o6RrYDw8DZ8EJ.eval: 100%|██████████| 1.25MB / 1.25MB            [A[A
-
-
-  ...KyWa4dGVujhwH6RTBgvj.eval: 100%|██████████| 2.10MB / 2.10MB            [A[A[A
-
-
-
-  ...RA8LWMgGF9zLgR4VYgxF.eval: 100%|██████████| 1.41MB / 1.41MB            [A[A[A[A
-
-
-
-
-  ...y8V9wk3NMSdGiAzkpM7D.eval: 100%|██████████| 1.11MB / 1.11MB            [A[A[A[A[A
-
-
-
-
-
-  ...sa5JcpF67yZ75xEbnGDX.eval: 100%|██████████|  745kB /  745kB            [A[A[A[A[A[A
-
-
-
-
-
-
-  ...9bknJdFYXUiwT4teWidL.eval: 100%|██████████|  901kB /  901kB            [A[A[A[A[A[A[A
-
-
-
-
-
-
-
-  ...muoznZP8bxTDmVMRHTgU.eval: 100%|██████████| 1.16MB / 1.16MB            [A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-  ...xoWrXAhYbGdceTcmsGLe.eval: 100%|██████████| 1.20MB / 1.20MB            [A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-  ...RrpckVR9NbKNpF4zddPc.eval: 100%|██████████| 1.24MB / 1.24MB            [A[A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-
-  ...rkBhaZsbMs4SCSBujfKo.eval: 100%|██████████| 1.31MB / 1.31MB            [A[A[A[A[A[A[A[A[A[A[A
-
-  ...tstoBQ9o6RrYDw8DZ8EJ.eval: 100%|██████████| 1.25MB / 1.25MB            [A[A
-
-
-  ...KyWa4dGVujhwH6RTBgvj.eval: 100%|██████████| 2.10MB / 2.10MB            [A[A[A
-
-
-
-  ...RA8LWMgGF9zLgR4VYgxF.eval: 100%|██████████| 1.41MB / 1.41MB            [A[A[A[A
-
-
-
-
-  ...y8V9wk3NMSdGiAzkpM7D.eval: 100%|██████████| 1.11MB / 1.11MB            [A[A[A[A[A
-
-
-
-
-
-  ...sa5JcpF67yZ75xEbnGDX.eval: 100%|██████████|  745kB /  745kB            [A[A[A[A[A[A
-
-
-
-
-
-
-  ...9bknJdFYXUiwT4teWidL.eval: 100%|██████████|  901kB /  901kB            [A[A[A[A[A[A[A
-
-
-
-
-
-
-
-  ...muoznZP8bxTDmVMRHTgU.eval: 100%|██████████| 1.16MB / 1.16MB            [A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-  ...xoWrXAhYbGdceTcmsGLe.eval: 100%|██████████| 1.20MB / 1.20MB            [A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-  ...RrpckVR9NbKNpF4zddPc.eval: 100%|██████████| 1.24MB / 1.24MB            [A[A[A[A[A[A[A[A[A[A
-
-
-
-
-
-
-
-
-
-
-  ...rkBhaZsbMs4SCSBujfKo.eval: 100%|██████████| 1.31MB / 1.31MB            [A[A[A[A[A[A[A[A[A[A[AProcessing Files (11 / 11)    : 100%|██████████| 13.5MB / 13.5MB, 6.73MB/s  
-New Data Upload               : 100%|██████████| 13.5MB / 13.5MB, 6.73MB/s  
-  ...tstoBQ9o6RrYDw8DZ8EJ.eval: 100%|██████████| 1.25MB / 1.25MB            
-  ...KyWa4dGVujhwH6RTBgvj.eval: 100%|██████████| 2.10MB / 2.10MB            
-  ...RA8LWMgGF9zLgR4VYgxF.eval: 100%|██████████| 1.41MB / 1.41MB            
-  ...y8V9wk3NMSdGiAzkpM7D.eval: 100%|██████████| 1.11MB / 1.11MB            
-  ...sa5JcpF67yZ75xEbnGDX.eval: 100%|██████████|  745kB /  745kB            
-  ...9bknJdFYXUiwT4teWidL.eval: 100%|██████████|  901kB /  901kB            
-  ...muoznZP8bxTDmVMRHTgU.eval: 100%|██████████| 1.16MB / 1.16MB            
-  ...xoWrXAhYbGdceTcmsGLe.eval: 100%|██████████| 1.20MB / 1.20MB            
-  ...RrpckVR9NbKNpF4zddPc.eval: 100%|██████████| 1.24MB / 1.24MB            
-  ...rkBhaZsbMs4SCSBujfKo.eval: 100%|██████████| 1.31MB / 1.31MB            
-uploaded stage1_ep4
-=== V3 COMPLETE rc=1 Mon May 18 11:23:10 UTC 2026 ===

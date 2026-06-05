@@ -1,76 +1,32 @@
-# MATS Workspace
+# Shared Assistant Commands
 
-Shared Claude Code resources and commands for MATS research projects.
+Reusable Claude Code command prompts and workspace defaults.
 
-This repo provides reusable skills, prompts, and the **Ralph Wiggum** autonomous development loop for use across multiple projects.
+This repository is intentionally small. It keeps command definitions and shared
+configuration that can travel between projects, while project code, logs,
+archives, virtual environments, and generated reports stay local or live in
+their own repositories.
 
-## Setup
+## Commands
 
-```bash
-# Add ralph to PATH (add to ~/.zshrc)
-export PATH="$PATH:$HOME/path/to/099_workspace_setup/ralph"
-```
+The public slash commands live in `.claude/commands/`:
 
-## Usage Flow
+- `/code-deepdive` - produce a line-level engineering analysis of a code file
+- `/code-learn` - work through a coding task with deliberate learning gaps
+- `/pyenv-setup` - initialize a Python project environment with `uv`
+- `/read-paper` - download and summarize an arxiv paper from source
+- `/report` - generate a project progress report into a local reports folder
+- `/space-learn` - run a Socratic learning session and generate flashcards
 
-### Starting a new project with Ralph
+## Local State
 
-```bash
-# 1. Create/navigate to your project
-cd ~/projects/my-research-project
-git init
+The repo ignores local workspace state by default:
 
-# 2. Initialize Ralph files
-ralph.sh init
-# OR interactively: claude → /ralph-init
+- `projects/` for cloned project repositories
+- `.venv*/` and `.cache/` for environments and caches
+- `.secrets` and `.claude/settings.local.json` for machine-specific settings
+- `_local_archive/`, `logbook/`, `writeup/`, and `reports/` for generated or
+  historical artifacts
 
-# 3. Generate specs (interactive — requires human conversation)
-claude
-# Then: /ralph-specs
-# Discuss your JTBD, answer questions, Claude generates specs/*.md
-
-# 4. Customize AGENTS.md with your project's test/build/lint commands
-
-# 5. Run planning loop
-ralph.sh plan
-# Reads specs, analyzes codebase, generates IMPLEMENTATION_PLAN.md
-
-# 6. Run building loop
-ralph.sh build --max 30
-# Creates branch ralph/my-feature-20260201-1430
-# Each iteration: pick task → implement → test → commit → repeat
-# On completion: pushes branch, creates draft PR
-
-# 7. Review and merge
-gh pr view                    # or: claude → /ralph-review
-gh pr merge --squash
-ralph.sh cleanup              # removes merged worktree branches
-```
-
-### Resuming an interrupted session
-
-```bash
-ralph.sh build
-# > Found existing Ralph session on branch ralph/xyz. Resume? (y/n)
-# > y
-# Continues from where it left off
-```
-
-### Scoped work on a branch
-
-```bash
-ralph.sh plan-work "add attention visualization"
-ralph.sh build
-```
-
-## Structure
-
-```
-099_workspace_setup/
-├── ralph/
-│   ├── ralph.sh              # Main loop script
-│   ├── prompts/              # Iteration prompts
-│   └── templates/            # Project templates
-├── .claude/commands/         # Slash commands (/ralph-*)
-└── skills/                   # Reusable Claude Code skills
-```
+Keep new project-specific commands in the relevant project repo unless they are
+general enough to be reused across unrelated projects.

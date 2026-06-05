@@ -1,13 +1,38 @@
+# Machine-local Claude settings
 .claude/settings.local.json
-.venv 
-# Keep projects folder but ignore all its contents except .gitkeep
-projects/*
-!projects/.gitkeep
+.claude/skills/
+
+# Secrets and environment files
 .secrets
-unsloth_compiled_cache/
+.env
+.env.*
+secrets/
+
+# Python and tool caches
 .cache/
-_local_archive/
+.venv/
+.venv-*/
 __pycache__/
 *.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+unsloth_compiled_cache/
+
+# Local cloned repositories
+projects/*
+!projects/.gitkeep
+
+# Optional local skills
+skills/*
+!skills/.gitkeep
+
+# Generated or archived local artifacts
+reports/
+_local_archive/
 logbook/
-infra/modal/random_eval_progress.log
+stage1_eval_logs/
+writeup/
+
+# Transient files
+0

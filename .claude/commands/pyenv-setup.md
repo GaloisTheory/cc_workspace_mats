@@ -21,14 +21,16 @@ Check if git user identity is configured:
 git config --global user.name 2>/dev/null; git config --global user.email 2>/dev/null
 ```
 
-**If either is not set**, configure them automatically:
+**If either is not set**, ask the user whether they want to configure a global
+Git identity now. If yes, ask for the exact name and email, then run:
 
 ```bash
-git config --global user.name "Dohun Lee"
-git config --global user.email "d.lee2176@gmail.com"
+git config --global user.name "<name>"
+git config --global user.email "<email>"
 ```
 
-Report what was set. If both were already configured, skip silently.
+If both were already configured, skip silently. Never guess or hard-code a
+personal identity.
 
 ### Step 2: Check for Existing `.venv`
 
@@ -218,10 +220,10 @@ else:
 
 #### 9a. Find `.secrets` file
 
-Search for a `.secrets` file in common locations (check in this order):
+Search for a `.secrets` file in common local locations (check in this order):
 
 ```bash
-for p in "$(pwd)/.secrets" "/workspace/.secrets" "$HOME/cc_workspace_mats/.secrets" "/mnt/data/cc_workspace_mats/.secrets"; do
+for p in "$(pwd)/.secrets" "$HOME/.secrets"; do
   [ -f "$p" ] && echo "FOUND: $p" && break
 done
 ```
@@ -290,7 +292,7 @@ Then re-check and report status.
 > - `GITHUB_TOKEN` — needed for git push to private repos
 > - `WANDB_API_KEY` — needed for Weights & Biases logging
 >
-> Create a `.secrets` file with your keys:
+> Create a local `.secrets` file with whichever keys this project needs:
 > ```bash
 > cat > .secrets << 'EOF'
 > GITHUB_TOKEN=ghp_...
