@@ -21,6 +21,8 @@ environments, caches, or secrets to this repo.
 - `/pyenv-setup` - Python environment setup with `uv`.
 - `/read-paper` - arxiv source download and paper summary.
 - `/space-learn` - Socratic learning session with flashcard output.
+- `/vault-capture` - write project memory (STATE.md + session note) into dohun_vault.
+- `/vault-load` - progressive, manifest-first onboarding from dohun_vault.
 
 ## Maintenance Guidelines
 
