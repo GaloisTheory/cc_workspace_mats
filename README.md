@@ -15,7 +15,6 @@ The public slash commands live in `.claude/commands/`:
 - `/code-learn` - work through a coding task with deliberate learning gaps
 - `/pyenv-setup` - initialize a Python project environment with `uv`
 - `/read-paper` - download and summarize an arxiv paper from source
-- `/report` - generate a project progress report into a local reports folder
 - `/space-learn` - run a Socratic learning session and generate flashcards
 
 ## Local State

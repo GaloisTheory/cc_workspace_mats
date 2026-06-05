@@ -20,7 +20,6 @@ environments, caches, or secrets to this repo.
 - `/code-learn` - scaffolded coding for deliberate practice.
 - `/pyenv-setup` - Python environment setup with `uv`.
 - `/read-paper` - arxiv source download and paper summary.
-- `/report` - generic project progress report generation.
 - `/space-learn` - Socratic learning session with flashcard output.
 
 ## Maintenance Guidelines
