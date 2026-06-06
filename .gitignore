@@ -1,6 +1,9 @@
 # Machine-local Claude settings
 .claude/settings.local.json
-.claude/skills/
+# Local skills are untracked by default, but the shared vault skills are tracked
+.claude/skills/*
+!.claude/skills/vault-capture/
+!.claude/skills/vault-load/
 
 # Secrets and environment files
 .secrets
