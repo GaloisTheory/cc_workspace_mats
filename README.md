@@ -16,8 +16,14 @@ The public slash commands live in `.claude/commands/`:
 - `/pyenv-setup` - initialize a Python project environment with `uv`
 - `/read-paper` - download and summarize an arxiv paper from source
 - `/space-learn` - run a Socratic learning session and generate flashcards
-- `/vault-capture` - write durable project memory (STATE.md + session note) into dohun_vault
-- `/vault-load` - onboard from dohun_vault with progressive, manifest-first loading
+
+## Skills
+
+The shared skills live in `.claude/skills/` and are loaded at session startup
+(restart your session to pick up newly added skills):
+
+- `vault-capture` - write durable project memory (STATE.md + session note) into dohun_vault
+- `vault-load` - onboard from dohun_vault with progressive, manifest-first loading
 
 ## Local State
 

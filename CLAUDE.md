@@ -6,6 +6,8 @@ defaults. It should stay lightweight and project-agnostic.
 ## Repository Shape
 
 - `.claude/commands/` contains public slash command prompts.
+- `.claude/skills/` contains shared skills (currently the vault pair); these
+  load at session startup, so restart a session to pick up newly added skills.
 - `.claude/settings.json` contains sanitized shared defaults only.
 - `projects/` is a local-only container for cloned repositories.
 - `skills/` is reserved for optional local skills and keeps only `.gitkeep`
@@ -21,8 +23,11 @@ environments, caches, or secrets to this repo.
 - `/pyenv-setup` - Python environment setup with `uv`.
 - `/read-paper` - arxiv source download and paper summary.
 - `/space-learn` - Socratic learning session with flashcard output.
-- `/vault-capture` - write project memory (STATE.md + session note) into dohun_vault.
-- `/vault-load` - progressive, manifest-first onboarding from dohun_vault.
+
+## Public Skills
+
+- `vault-capture` - write project memory (STATE.md + session note) into dohun_vault.
+- `vault-load` - progressive, manifest-first onboarding from dohun_vault.
 
 ## Maintenance Guidelines
 
