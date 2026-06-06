@@ -44,15 +44,18 @@ it prints available slugs — ask the user which listed slug to use.
 
 Read in this order, stopping as soon as you have enough:
 
-1. `<project>/STATE.md`.
-2. `README.md` only if unfamiliar with the project or `STATE.md` lacks
+1. `<project>/STATE.md` — the handoff contract.
+2. `<project>/AGENTS.md` if it exists — the project's working contract (how to
+   work here: code style, compute, guardrails). Always load this when present.
+3. `README.md` only if unfamiliar with the project or `STATE.md` lacks
    orientation.
-3. The newest session only if `STATE.md` points to it or leaves a concrete
+4. The newest session only if `STATE.md` points to it or leaves a concrete
    missing detail.
-4. Older sessions only to answer a specific question. Stop at three sessions
+5. Older sessions only to answer a specific question. Stop at three sessions
    unless the user asks for deeper history.
 
-Read `AGENTS.md` only when changing vault conventions.
+The vault-root `AGENTS.md` is the vault operating manual — read it only when
+changing vault conventions, not for normal project work.
 
 If `STATE.md` or a session is larger than ~100 lines / ~10 KB (per the
 manifest), inspect headings and relevant sections first rather than reading the

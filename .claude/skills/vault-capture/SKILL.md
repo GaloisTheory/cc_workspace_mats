@@ -56,6 +56,10 @@ Then load progressively:
 
 Do NOT read every session.
 
+If this session changed durable *working norms* (code style, compute policy,
+how to work on the project), update `<project>/AGENTS.md` — not `STATE.md`.
+`AGENTS.md` is the working contract; `STATE.md` is the current-state snapshot.
+
 ## 4. Capture
 
 Ask only for missing info. Prefer ONE combined question covering: the session
@@ -75,7 +79,7 @@ frontmatter:
 type: session
 project: <slug>
 date: <YYYY-MM-DD>
-agent: claude
+agent: <your runtime: claude or codex>
 slug: <session-slug>
 title: <human-readable title>
 tags: [session, agent-memory, <project>]
@@ -102,7 +106,7 @@ log. Frontmatter:
 ---
 project: <slug>
 updated: <YYYY-MM-DD>
-last_agent: claude
+last_agent: <your runtime: claude or codex>
 phase: <current phase>
 ---
 ```
