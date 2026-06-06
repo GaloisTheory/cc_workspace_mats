@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vault Capture"
+  short_description: "Capture project memory into dohun_vault"
+  default_prompt: "Use $vault-capture to save memory for project slug tda_olmo."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vault Load"
+  short_description: "Load project memory from dohun_vault"
+  default_prompt: "Use $vault-load to load memory for project slug tda_olmo."
