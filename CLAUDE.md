@@ -29,6 +29,12 @@ environments, caches, or secrets to this repo.
 - `vault-capture` - write project memory (STATE.md + session note) into dohun_vault.
 - `vault-load` - progressive, manifest-first onboarding from dohun_vault.
 
+These skills are the single canonical copy. Codex consumes them via symlink
+(`~/.codex/skills/{vault-load,vault-capture}` → `.claude/skills/...`), set up by
+`scripts/link-codex-skills.sh` — so edit the skill once here and both agents see
+it. Keep the `agent`/`last_agent` template fields runtime-neutral so the shared
+files read correctly for either agent.
+
 ## Maintenance Guidelines
 
 - Keep commands generic. If a command depends on a specific project, dataset,
