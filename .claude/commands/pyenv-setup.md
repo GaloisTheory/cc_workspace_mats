@@ -4,12 +4,12 @@ Set up a Python virtual environment using `uv` in the current project directory.
 
 ## Usage
 
-`/pyenv-setup` - Set up with Python 3.10 (default)
+`/pyenv-setup` - Set up with Python 3.12 (default)
 `/pyenv-setup <version>` - Set up with a specific Python version (e.g., `/pyenv-setup 3.11`)
 
 $ARGUMENTS
 
-**Python version:** If `$ARGUMENTS` is provided, use it as the Python version. Otherwise default to `3.10`.
+**Python version:** If `$ARGUMENTS` is provided, use it as the Python version. Otherwise default to `3.12`.
 
 ## Instructions
 
@@ -102,7 +102,7 @@ ls pyproject.toml 2>/dev/null
 uv init --python <version>
 ```
 
-Where `<version>` is `$ARGUMENTS` or `3.10` if not provided.
+Where `<version>` is `$ARGUMENTS` or `3.12` if not provided.
 
 ### Step 5: Initialize Git Submodules
 
@@ -138,12 +138,6 @@ This creates the `.venv` and installs all dependencies from `pyproject.toml`.
 
 If this fails, check the error output and help the user troubleshoot (common issues: Python version not installed, network errors, incompatible dependency versions).
 
-**flash-attn note:** If `uv sync` fails on `flash-attn` (common — needs source build against installed torch), try:
-```bash
-TMPDIR=$(pwd)/.build_tmp MAX_JOBS=4 uv pip install flash-attn --no-build-isolation
-```
-Clean up the temp dir afterward: `rm -rf .build_tmp`
-
 ### Step 7: Explain Activation
 
 Print the following guidance:
@@ -158,37 +152,43 @@ Print the following guidance:
 > | Direct path | `.venv/bin/python script.py` | Quick one-offs |
 > | Activate manually | `source .venv/bin/activate` | Your own terminal sessions |
 
-### Step 8: CUDA/PyTorch Check (Conditional)
+### Step 8: Compute Backend — Local GPU or Modal
 
-Check if `pyproject.toml` mentions torch:
+GPU work in this workspace runs **either** on a local GPU **or** remotely on
+[Modal](https://modal.com). Detect which applies before installing any CUDA
+wheels — don't install local CUDA torch on a box that has no GPU.
 
-```bash
-grep -iE "torch|pytorch|torchvision" pyproject.toml
-```
-
-**If torch is NOT mentioned:**
-
-Check if we're on a GPU box (NVIDIA GPU present):
+First, check for a local NVIDIA GPU:
 
 ```bash
 nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1
 ```
 
-If a GPU is detected, ask:
+#### 8a. Local GPU present
 
-> **GPU detected** (`<gpu-name>`), but PyTorch is not in your dependencies. Would you like to add it?
-> 1. **Yes** - Add torch with CUDA support
-> 2. **No** - Skip for now
+If a GPU is detected, treat this as a local-GPU box. Check whether torch is a dependency:
+
+```bash
+grep -iE "torch|pytorch|torchvision" pyproject.toml
+```
+
+**If torch is NOT mentioned**, ask:
+
+> **Local GPU detected** (`<gpu-name>`), but PyTorch is not in your dependencies. Add it?
+> 1. **Yes** — add torch with CUDA support
+> 2. **No** — skip (e.g. GPU work will run on Modal instead)
 
 If yes:
 ```bash
-uv add torch torchvision --index-url https://download.pytorch.org/whl/cu124
+uv add torch torchvision --index-url https://download.pytorch.org/whl/cu128
 ```
-Then continue to the CUDA verification below.
+Then continue to the CUDA verification below. (Pick a wheel index matching the
+box's CUDA driver — `cu128` is the current default; use `cu126`/`cu124` for
+older drivers.)
 
 If no, skip to Step 9.
 
-**If torch IS mentioned**, verify CUDA availability:
+**If torch IS mentioned** (or was just added), verify CUDA availability:
 
 ```bash
 uv run python -c "
@@ -209,12 +209,23 @@ else:
 > **Warning:** GPU hardware detected but PyTorch can't access CUDA. This usually means PyTorch was installed without CUDA support. To fix:
 > ```bash
 > uv remove torch torchvision
-> uv add torch torchvision --index-url https://download.pytorch.org/whl/cu124
+> uv add torch torchvision --index-url https://download.pytorch.org/whl/cu128
 > ```
 
 **If CUDA is available**, report the GPU info.
 
-**If no GPU hardware is present**, just report that PyTorch is installed (CPU-only) with no warning.
+#### 8b. No local GPU
+
+If no GPU hardware is present, this is a CPU/dev box — GPU compute runs on
+**Modal**, not locally. Do **not** install CUDA torch wheels here. Briefly
+confirm the assumption with the user:
+
+> **No local GPU detected** — assuming GPU work runs on Modal. (If you expected
+> a local GPU, check your drivers / `nvidia-smi`.)
+
+If `grep -iE "torch|pytorch|torchvision" pyproject.toml` still shows torch as a
+dependency, that's fine for local dev — just report it's installed (CPU-only),
+with no CUDA warning. Modal readiness is checked in Step 10.
 
 ### Step 9: API Keys & Secrets Persistence
 
@@ -272,7 +283,7 @@ Where `<SECRETS_PATH>` is the path found in step 9a.
 Check if common ML API keys are set in the current environment:
 
 ```bash
-echo "HF_TOKEN=${HF_TOKEN:+set}" && echo "OPENROUTER_API_KEY=${OPENROUTER_API_KEY:+set}" && echo "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:+set}" && echo "GITHUB_TOKEN=${GITHUB_TOKEN:+set}" && echo "WANDB_API_KEY=${WANDB_API_KEY:+set}"
+echo "HF_TOKEN=${HF_TOKEN:+set}" && echo "OPENROUTER_API_KEY=${OPENROUTER_API_KEY:+set}" && echo "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:+set}" && echo "GITHUB_TOKEN=${GITHUB_TOKEN:+set}" && echo "WANDB_API_KEY=${WANDB_API_KEY:+set}" && echo "MODAL_TOKEN_ID=${MODAL_TOKEN_ID:+set}" && echo "MODAL_TOKEN_SECRET=${MODAL_TOKEN_SECRET:+set}"
 ```
 
 **If any keys are not set but a `.secrets` file was found:** Source it now for the current session:
@@ -291,6 +302,7 @@ Then re-check and report status.
 > - `ANTHROPIC_API_KEY` — needed for Anthropic API
 > - `GITHUB_TOKEN` — needed for git push to private repos
 > - `WANDB_API_KEY` — needed for Weights & Biases logging
+> - `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET` — needed for Modal remote compute ([create token](https://modal.com/settings/tokens))
 >
 > Create a local `.secrets` file with whichever keys this project needs:
 > ```bash
@@ -300,13 +312,66 @@ Then re-check and report status.
 > OPENROUTER_API_KEY=sk-or-...
 > WANDB_API_KEY=wandb_...
 > ANTHROPIC_API_KEY=sk-ant-...
+> MODAL_TOKEN_ID=ak-...
+> MODAL_TOKEN_SECRET=as-...
 > EOF
 > ```
 > Then re-run `/pyenv-setup` to persist them.
 
 Only mention the keys that are actually missing.
 
-### Step 10: Print Summary
+### Step 10: Modal Setup Check
+
+Modal is the workspace's remote GPU/compute backend. This is a light-touch
+verification — confirm it's ready, don't reconfigure unless the user asks.
+
+#### 10a. Is `modal` a dependency?
+
+```bash
+grep -iqE "(^|[^a-z])modal([^a-z]|$)" pyproject.toml && echo "MODAL_IN_DEPS" || echo "MODAL_NOT_IN_DEPS"
+```
+
+**If `MODAL_NOT_IN_DEPS`**, ask:
+
+> **Modal isn't in `pyproject.toml`.** Add it?
+> 1. **Yes** — `uv add modal`
+> 2. **No** — skip
+
+If yes:
+```bash
+uv add modal
+```
+
+If modal is already a dependency, continue.
+
+#### 10b. Are Modal credentials available and valid?
+
+Modal authenticates via `MODAL_TOKEN_ID` + `MODAL_TOKEN_SECRET` (exported from
+`.secrets`, handled in Step 9) or via `~/.modal.toml`. Check what's present:
+
+```bash
+echo "MODAL_TOKEN_ID=${MODAL_TOKEN_ID:+set}"; echo "MODAL_TOKEN_SECRET=${MODAL_TOKEN_SECRET:+set}"; ls ~/.modal.toml 2>/dev/null && echo "modal.toml present"
+```
+
+**If credentials are present** (env vars or `~/.modal.toml`), verify auth works
+with a lightweight authenticated call:
+
+```bash
+uv run modal app list 2>&1 | head -5
+```
+
+- If it lists apps (or reports zero apps) without an auth error → Modal is set up. Report success.
+- If it errors with an authentication/token error → credentials are present but invalid; surface the error.
+
+**If credentials are NOT present** (no env vars and no `~/.modal.toml`), tell the user:
+
+> Modal isn't authenticated. Either:
+> - Add `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET` to your `.secrets` file (Step 9 persists them), **or**
+> - Run interactively in your own terminal: `uv run modal setup`
+>
+> (The `modal setup` flow is browser-based, so Claude Code can't complete it for you.)
+
+### Step 11: Print Summary
 
 ```
 Python environment ready!
@@ -316,15 +381,18 @@ Python environment ready!
   uv:        <version from uv --version>
   Project:   <pyproject.toml status: existing / newly created>
   Location:  .venv/
+  Compute:   <local GPU: <name> / Modal (no local GPU)>
   <if torch>
   PyTorch:   <version>
   CUDA:      <available/not available> <GPU name if available>
   </if torch>
+  Modal:     <in deps + authenticated / in deps, not authenticated / not in deps>
   Secrets:   <sourced from path / not found>
   HF_TOKEN:  <set / not set>
   OPENROUTER_API_KEY: <set / not set>
   ANTHROPIC_API_KEY:  <set / not set>
   GITHUB_TOKEN:       <set / not set>
+  MODAL_TOKEN_ID:     <set / not set>
 
 Quick start:
   uv run python script.py     # Run a script
