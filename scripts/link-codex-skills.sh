@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Link the shared vault skills into Codex so Claude and Codex use one canonical
+# Link the shared skills into Codex so Claude and Codex use one canonical
 # copy (this repo). Idempotent: safe to re-run. Existing real dirs are backed up
-# to <codex-skills>/.bak_vault_<epoch>/ before being replaced with a symlink.
+# to <codex-skills>/.bak_skills_<epoch>/ before being replaced with a symlink.
 #
 # Usage:   bash scripts/link-codex-skills.sh
 # Override the Codex skills dir:   CODEX_SKILLS=/path/to/.codex/skills bash scripts/link-codex-skills.sh
@@ -10,7 +10,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC="$REPO_ROOT/.claude/skills"
 CODEX_SKILLS="${CODEX_SKILLS:-$HOME/.codex/skills}"
-SKILLS=(vault-load vault-capture)
+SKILLS=(vault-load vault-capture code-redteam)
 
 mkdir -p "$CODEX_SKILLS"
 backup=""
@@ -25,7 +25,7 @@ for s in "${SKILLS[@]}"; do
     rm "$link"
   elif [[ -e "$link" ]]; then
     if [[ -z "$backup" ]]; then
-      backup="$CODEX_SKILLS/.bak_vault_$(date +%s)"
+      backup="$CODEX_SKILLS/.bak_skills_$(date +%s)"
       mkdir -p "$backup"
     fi
     mv "$link" "$backup/$s"
@@ -35,4 +35,4 @@ for s in "${SKILLS[@]}"; do
   echo "linked $link -> $target"
 done
 
-echo "done. verify: ls -la \"$CODEX_SKILLS\" | grep vault"
+echo "done. verify: ls -la \"$CODEX_SKILLS\" | grep -E 'vault|redteam'"

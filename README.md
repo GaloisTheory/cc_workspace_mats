@@ -22,21 +22,24 @@ The public slash commands live in `.claude/commands/`:
 The shared skills live in `.claude/skills/` and are loaded at session startup
 (restart your session to pick up newly added skills):
 
+- `code-redteam` - adversarial red-team review of a code file (research-validity
+  focus): severity-ranked findings, exhaustive parameter/silent-choice inventory,
+  markdown report with executive summary
 - `vault-capture` - write durable project memory (STATE.md + session note) into dohun_vault
 - `vault-load` - onboard from dohun_vault with progressive, manifest-first loading
 
 ### Codex sync
 
-The vault skills are shared with Codex via symlink so there is one canonical
+The shared skills are shared with Codex via symlink so there is one canonical
 copy (this repo) and no drift. On a fresh machine, run:
 
 ```bash
 bash scripts/link-codex-skills.sh
 ```
 
-This points `~/.codex/skills/{vault-load,vault-capture}` at the repo's
-`.claude/skills/` dirs (idempotent; backs up any existing real dirs). Restart
-Codex afterward to pick up the skills.
+This points `~/.codex/skills/{vault-load,vault-capture,code-redteam}` at the
+repo's `.claude/skills/` dirs (idempotent; backs up any existing real dirs).
+Restart Codex afterward to pick up the skills.
 
 ## Local State
 
