@@ -6,8 +6,9 @@ defaults. It should stay lightweight and project-agnostic.
 ## Repository Shape
 
 - `.claude/commands/` contains public slash command prompts.
-- `.claude/skills/` contains shared skills (currently the vault pair); these
-  load at session startup, so restart a session to pick up newly added skills.
+- `.claude/skills/` contains shared skills (the vault pair plus code-redteam);
+  these load at session startup, so restart a session to pick up newly added
+  skills.
 - `.claude/settings.json` contains sanitized shared defaults only.
 - `projects/` is a local-only container for cloned repositories.
 - `skills/` is reserved for optional local skills and keeps only `.gitkeep`
@@ -26,11 +27,13 @@ environments, caches, or secrets to this repo.
 
 ## Public Skills
 
+- `code-redteam` - adversarial red-team review of a code file: research-validity
+  findings ranked by severity, parameter/silent-choice inventory, MD report.
 - `vault-capture` - write project memory (STATE.md + session note) into dohun_vault.
 - `vault-load` - progressive, manifest-first onboarding from dohun_vault.
 
 These skills are the single canonical copy. Codex consumes them via symlink
-(`~/.codex/skills/{vault-load,vault-capture}` → `.claude/skills/...`), set up by
+(`~/.codex/skills/{vault-load,vault-capture,code-redteam}` → `.claude/skills/...`), set up by
 `scripts/link-codex-skills.sh` — so edit the skill once here and both agents see
 it. Keep the `agent`/`last_agent` template fields runtime-neutral so the shared
 files read correctly for either agent.
