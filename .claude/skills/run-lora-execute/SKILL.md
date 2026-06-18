@@ -4,16 +4,16 @@ description: >-
   Execute a reviewed AFT / stacked-LoRA training recipe on Modal. Takes a recipe
   PR (number) or a configs/aft_runs/*.json path, resolves the merged main commit
   as the Modal --git-ref, shows the resolved --execute plan plus a rough GPU
-  cost estimate, HF write destinations, grader/payment notes, and plotting
-  outputs, then asks for one explicit in-session launch authorization covering
-  the selected pipeline. Once authorized, keep running through the approved
-  steps by default: training, HF verification, evals, grading, aggregation, HF
-  uploads/pins, plotting, and any approved final PR/push. Stop only on failure,
-  plan/cost/destination drift, missing config support, or work outside the
-  approved scope. Use when the user wants to actually run / launch / kick off a
-  recipe on Modal, execute a merged training PR, or continue the post-training
-  eval/plot pipeline. The sibling /run-lora-training authors the recipe and PR;
-  this skill runs it.
+  cost estimate, HF write destinations, grader/payment notes, plotting outputs,
+  and the default parallel train fan-out/logging plan, then asks for one
+  explicit in-session launch authorization covering the selected pipeline. Once
+  authorized, keep running through the approved steps by default: training, HF
+  verification, evals, grading, aggregation, HF uploads/pins, plotting, and any
+  approved final PR/push. Stop only on failure, plan/cost/destination drift,
+  missing config support, or work outside the approved scope. Use when the user
+  wants to actually run / launch / kick off a recipe on Modal, execute a merged
+  training PR, or continue the post-training eval/plot pipeline. The sibling
+  /run-lora-training authors the recipe and PR; this skill runs it.
 ---
 
 # Run LoRA Execute — Recipe Execution
@@ -30,6 +30,10 @@ was already previewed and approved.
 The runner is `tools/run_aft_recipe.py`. Steps it understands (via `--step`):
 `train`, `verify`, `eval`, `grade`, `aggregate`, `upload`, `plot`. Selection
 can also be narrowed with `--job <id>`.
+When multiple `train` actions are selected, the runner parallelizes them by
+default. Use `--train-concurrency N` to bound fan-out, `--log-dir <dir>` to
+capture per-action logs, and `--serial-train` only when the user explicitly
+wants serialized training.
 
 Default automation scope: ask the user whether to run the whole downstream
 pipeline after training (`eval` -> `grade` -> `aggregate` -> `upload` ->
@@ -127,6 +131,10 @@ operations from there.
    ```
    If this fails, stop before spending. Do not work around collisions by adding
    `overwrite_hf`; replacing artifacts must be an explicit recipe-author choice.
+6. Confirm the local Modal entrypoint environment can import `huggingface_hub`
+   before a large launch. If `modal run` fails locally before remote spawn with
+   a missing `huggingface_hub`, repair the Modal uv tool env once:
+   `uv tool install modal==1.4.3 --with huggingface_hub==1.18.0 --force`.
 
 ## Phase 1: Preview + authorize the real plan (still no spend)
 
@@ -165,6 +173,11 @@ operations from there.
      is `overwrite_hf: true` on a job, which **does** replace existing artifacts:
      call that out as an irreversible action in the authorization when any job
      sets it,
+   - for training recipes with more than one selected train job, that the
+     execute command will run training in parallel by default, where the
+     per-action logs will be written, and any `--train-concurrency N` bound.
+     If no hard concurrency bound is needed, omit `--train-concurrency` and let
+     the runner fan out all selected train actions,
    - eval upload destinations: each `source_key`, resolved HF dataset path,
      and whether its revision is already pinned or still `PIN_AFTER_UPLOAD`,
    - plot keys and output directories,
@@ -188,13 +201,16 @@ operations from there.
    Phase 1 "go" covers training, do not ask again before starting the train
    step.
 2. Run training, scoped to the train step (and a specific `--job` if the user
-   wants only one):
+   wants only one). For multi-job recipes, use the runner's default parallel
+   train fan-out and write per-action logs:
    ```
-   PYTHONPATH=src uv run python tools/run_aft_recipe.py <config> --execute --git-ref <SHA> --step train
+   PYTHONPATH=src uv run python tools/run_aft_recipe.py <config> --execute --git-ref <SHA> --step train --manifest-out results/manifests/<name>_train_execute.json --log-dir results/parallel_<name>_logs
    ```
-   Stream output. If a Modal job fails, stop and report — do not silently
-   continue to later steps (the runner uses `check=True`, so a failure raises;
-   surface it).
+   Add `--train-concurrency N` when the preview/authorization bounded
+   concurrency. Add `--serial-train` only when the user explicitly chose
+   serialized execution. If any Modal job fails, stop and report — do not
+   silently continue to later steps. The runner waits for sibling train actions
+   to finish collecting logs, then raises before verification.
 3. After training, run the in-config HF verification:
    ```
    PYTHONPATH=src uv run python tools/run_aft_recipe.py <config> --execute --git-ref <SHA> --step verify
@@ -209,6 +225,12 @@ operations from there.
    verification checks **metadata identity, not weight hashes or final loss** —
    if the user needs bitwise/loss-level confirmation (e.g. reproducing a prior
    run), do that separately and say so.
+4. Adapter uploads now retry retryable HF failures and inspect the target
+   prefix after any upload error. If a 504 still escapes, inspect the HF
+   prefixes before rerunning GPU work: an already-uploaded `delta` plus empty
+   no-adapter `combined` prefix can usually be recovered without retraining by
+   copying root-level delta files and writing raw-base `combined_metadata`
+   (`combination_type: single_adapter`).
 
 ## Phase 3: Downstream pipeline (default yes, authorized continuous run)
 

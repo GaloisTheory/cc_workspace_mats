@@ -21,13 +21,16 @@ dry-run → open PR → **stop**. It must **never** run Modal, never spend GPU
 money, and never merge. Execution is the job of `/run-lora-execute`, which
 runs only after a human reviews and (per the user's preference) merges the PR.
 
-The recipe runner is `tools/run_aft_recipe.py`; recipes live in
-`configs/aft_runs/*.json`. Canonical templates by shape — read the one matching
-the run you are authoring before generating a new one:
+The recipe runner is `tools/run_aft_recipe.py`; recipes usually live in
+`configs/aft_runs/*.json`. MSM-specific plain-text sweeps may live in
+`configs/msm_run/*.json` when that existing family is the closest match.
+Canonical templates by shape — read the one matching the run you are authoring
+before generating a new one:
 - chat-SFT AFT (assistant-token loss): `l7_r1_epoch3_seed_replicates.json`,
   `l11_r1_epoch3_checkpoints.json`.
 - plain-text midtraining / no-adapter / multi-GPU DDP:
-  `msm_america_plaintext_noadapter_small_sweep.json`.
+  `msm_america_plaintext_noadapter_small_sweep.json` and
+  `configs/msm_run/msm_america_plaintext_layer_sweep.json`.
 
 All commands assume the repo root of `midtraining_generalization` and the
 `PYTHONPATH=src uv run ...` convention used throughout the repo.
@@ -97,6 +100,12 @@ First agree on:
     Remind the user that DDP multiplies the global batch:
     `batch_size * grad_accumulation * N` — keep that product equal to the intended
     effective batch (e.g. paper recipe 32) when choosing per-device `batch_size`.
+    DDP replicates model and activation memory; it is not a memory-sharding fix.
+    For 8B, packed `plain_text`, `max_length=block_size=4096`, DDP `H100:4`,
+    use `batch_size: 1`, `grad_accumulation: 8` as the safe starting default
+    for effective batch 32 unless the user explicitly wants a memory-risking
+    sweep. Still validate memory per recipe if model/rank/context/source
+    changes.
   - Single GPU is the default: omit `distributed_backend`/`num_processes` (or set
     `distributed_backend: "none"`).
   - If eval jobs are included, ask whether they should use the same GPU string;
@@ -172,6 +181,12 @@ Collect, at minimum, for the **training** section (all required by the schema):
   (bool, default `false` — set only to intentionally replace existing HF
   artifacts), `timeout` (default 7200s), `wandb_project`, `secret_name`,
   `repo_url`, `output_root`.
+  Large HF uploads can still 504. Execution code retries retryable upload
+  failures and checks whether the remote prefix completed after an error, but
+  recipe authoring should still prefer fresh disjoint `export_root`s. For
+  no-adapter combined artifacts, a failed combined upload after a successful
+  delta upload is often recoverable without retraining; do not encode a rerun
+  as the default recovery.
 
 Then ask **how far the recipe should describe the downstream pipeline**. The
 recipe can also carry `verifications`, `evals`, `grading`, `aggregation`,
@@ -276,7 +291,10 @@ Write `configs/aft_runs/<name>.json`. Requirements:
    the real ref is resolved by `/run-lora-execute` at run time.
 4. Show the user the dry-run plan and a short summary: how many train/eval/
    upload jobs, the GPU type/count, adapter `export_root`s, eval upload
-   `source_key`s/HF paths, and that `push_hf` is on/off. **Get the user's
+   `source_key`s/HF paths, and that `push_hf` is on/off. If the recipe defines
+   more than one training job, say that `/run-lora-execute` will run them in
+   parallel by default with per-action logs unless the user chooses
+   `--serial-train` or a bounded `--train-concurrency N`. **Get the user's
    explicit OK on the plan before opening the PR.**
 
 ## Phase 4: Branch + PR (stop here)
