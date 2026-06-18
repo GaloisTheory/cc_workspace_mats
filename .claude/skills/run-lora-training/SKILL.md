@@ -1,6 +1,6 @@
 ---
 name: run-lora-training
-description: Author a new AFT / stacked-LoRA training recipe and open a PR for review. Interviews you for the dataset, LoRA config, source variants, seeds, and hyperparameters; generates a validated configs/aft_runs/*.json recipe; runs the recipe runner in --dry-run to show the exact Modal commands; then opens a PR and stops. Spends no money and never runs Modal. Use when the user wants to set up / launch / kick off a new LoRA or AFT training run, add a new dataset/config to train on, create a new run recipe, or "run LORA training". The sibling /run-lora-execute takes the merged PR and actually runs it on Modal.
+description: Author a new AFT / stacked-LoRA training recipe and open a PR for review. Interviews you for the dataset, LoRA config, source variants, seeds, GPU type/count, Hugging Face adapter/eval upload layout, downstream eval/plot scope, and hyperparameters; generates a validated configs/aft_runs/*.json recipe; runs the recipe runner in --dry-run to show the exact Modal commands; then opens a PR and stops. Spends no money and never runs Modal. Use when the user wants to set up / launch / kick off a new LoRA or AFT training run, add a new dataset/config to train on, create a new run recipe, or "run LORA training". The sibling /run-lora-execute takes the merged PR and actually runs it on Modal.
 ---
 
 # Run LoRA Training — Recipe Authoring
@@ -18,6 +18,10 @@ at least one before generating a new one.
 
 All commands assume the repo root of `midtraining_generalization` and the
 `PYTHONPATH=src uv run ...` convention used throughout the repo.
+
+Never make silent resource or artifact-placement decisions. The recipe is the
+reviewable contract for GPU shape and Hugging Face destinations, so ask first
+and then write the agreed values explicitly.
 
 ## Phase 0: Locate the repo
 
@@ -45,15 +49,51 @@ workspace, so do not assume the current directory is the project.
      (valid eval `model_variants` / `transplant_only` keys) and
      `sweep_conditions`.
    - `configs/eval_results_sources.json` → valid upload `source_key`s.
+   - `tools/eval_results_plotting.py` → valid plot keys and the plotting
+     convention: plots load uploaded CSVs from Hugging Face via
+     `configs/eval_results_sources.json`, with concrete pinned revisions.
 3. Read one existing recipe in full as the structural template.
 
 ## Phase 1: Interview
 
-Use AskUserQuestion where the choice is bounded; ask plainly otherwise. Gather
-exactly what a recipe needs. **Do not invent values** — if the user doesn't
-care, offer the repo default and say so, but write it explicitly into the
-config (the recipe is meant to be a self-contained record; pinning every
-hyperparameter is a hard requirement of the hardened schema).
+Use AskUserQuestion where the choice is bounded; ask plainly otherwise. Start
+with the workflow-shaping choices, then gather exactly what a recipe needs.
+**Do not invent values** — if the user doesn't care, offer the repo default
+and say so, but write it explicitly into the config (the recipe is meant to be
+a self-contained record; pinning every hyperparameter is a hard requirement of
+the hardened schema).
+
+First agree on:
+
+- GPU resources. Ask how many GPUs and what type to use for training. Default
+  proposal: one `H100` (`gpu: "H100"`). For multiple GPUs, use Modal's GPU
+  string form such as `H100:8` only after the user agrees; do not leave `gpu`
+  implicit just because the schema allows it. If eval jobs are included, ask
+  whether they should use the same GPU string; default to the same value unless
+  the user chooses otherwise.
+- Hugging Face adapter uploads. Default proposal: `push_hf: true`, writing to
+  the shared adapter repo `GaloisTheory123/MSM-hillclimb`. Explain that this
+  can overwrite existing artifacts, offer `false` for a no-push trial, and
+  agree on the `export_root` parent folder before generating the recipe. A
+  sensible default is the existing compact style,
+  `<run_family>_epoch<E>_seed<S>/<lora_config>`, which the trainer expands to
+  `<export_root>/<source_variant>/delta` and
+  `<export_root>/<source_variant>/combined`.
+- Hugging Face eval uploads. Default proposal: include eval result uploads to
+  the dataset repo configured by `configs/eval_results_sources.json`
+  (`GaloisTheory123/MSM_activations` by default). Agree on the local
+  `results/...` run directories, upload `source_key`s, and HF paths before
+  writing the recipe. If new `source_key`s are needed, add matching entries to
+  `configs/eval_results_sources.json` in the same PR with
+  `revision: "PIN_AFTER_UPLOAD"` and paths such as
+  `eval_runs/free_evals_brian/<run_dir_stem>/lora_eval_rates.csv`; the execute
+  skill will replace each placeholder with the commit SHA printed by the
+  upload helper after upload.
+- Downstream scope. Default proposal: include verifications, evals, grading,
+  aggregation, uploads, and plots in the recipe so `/run-lora-execute` can ask
+  once about running the full pipeline and then gate paid/irreversible stages.
+  If the user wants train-only, include verifications but omit the downstream
+  sections.
 
 Collect, at minimum, for the **training** section (all required by the schema):
 
@@ -71,9 +111,10 @@ Collect, at minimum, for the **training** section (all required by the schema):
   overwrite existing artifacts; offer `false` for a no-push trial.
 - `export_root` — HF/output subpath (follow the naming of existing recipes,
   e.g. `stacked_aft2_sweep_epoch3_seed1/mlp_l7_r1`).
+- `gpu` — treat as required by this workflow even though the schema makes it
+  optional. Ask for type/count; default `H100` means one GPU.
 - Optional: `combined_checkpoint_epochs` (list, e.g. `[1, 3]`), `timeout`
-  (default 7200s), `gpu` (default H100), `wandb_project`, `secret_name`,
-  `repo_url`, `output_root`.
+  (default 7200s), `wandb_project`, `secret_name`, `repo_url`, `output_root`.
 
 Then ask **how far the recipe should describe the downstream pipeline**. The
 recipe can also carry `verifications`, `evals`, `grading`, `aggregation`,
@@ -84,6 +125,12 @@ training artifacts so the merged run can be checked — copy the artifact
 hyperparameters from the training job so the HF metadata check is meaningful.
 For evals, reuse the patterns in the template recipe (native sweep + reciprocal
 swaps) and only include conditions whose keys exist in the adapter registries.
+For uploads, use only agreed `source_key`s that exist in
+`configs/eval_results_sources.json`; add placeholder source entries in the same
+PR if necessary. For plots, use a plot key backed by
+`tools/eval_results_plotting.py`; if a new figure layout is needed, include the
+minimal plotting-code change in this PR and keep it consistent with the file's
+HF-download/source-config pattern rather than reading local results directly.
 
 If the user wants something the registries don't support (a brand-new source
 variant, LoRA spec, or eval condition), **stop and tell them**: that requires a
@@ -102,6 +149,10 @@ Write `configs/aft_runs/<name>.json`. Requirements:
   with values that match the corresponding training job (seed, epochs,
   dataset_*, hyperparameters) — otherwise the post-merge HF verification will
   correctly fail.
+- Every training and eval job records the agreed `gpu` string explicitly.
+- Every upload job points at an agreed `source_key`; every new source key has a
+  matching `configs/eval_results_sources.json` entry with a placeholder
+  revision to pin after upload.
 - Job `id`s are unique across all sections.
 - Match the formatting/ordering conventions of the existing recipes.
 
@@ -121,22 +172,30 @@ Write `configs/aft_runs/<name>.json`. Requirements:
    (Use `--git-ref DRYRUNREF` as a placeholder — the real ref is resolved by
    `/run-lora-execute` at run time.)
 3. Show the user the dry-run plan and a short summary: how many train/eval/
-   upload jobs, the GPU type, and that `push_hf` is on/off. **Get the user's
+   upload jobs, the GPU type/count, adapter `export_root`s, eval upload
+   `source_key`s/HF paths, and that `push_hf` is on/off. **Get the user's
    explicit OK on the plan before opening the PR.**
 
 ## Phase 4: Branch + PR (stop here)
 
 1. Never work on `main`. Create a branch, e.g.
-   `add-aft-recipe-<name>` (or `codex/...` to match repo convention).
-2. Commit only the new config (and any intentional doc edits). End the commit
-   message with the repo's co-author trailer convention.
+   `codex/add-aft-recipe-<name>`.
+2. Commit only the new config plus intentional companion files needed for the
+   reviewed recipe (`configs/eval_results_sources.json` placeholder entries or
+   `tools/eval_results_plotting.py` plot specs). End the commit message with
+   the repo's co-author trailer convention.
 3. Open a PR with `gh pr create`. The PR body must include:
    - what the run does (dataset, lora_config, variants, seeds, epochs),
+   - the agreed GPU type/count,
+   - the agreed HF adapter and eval upload layout,
    - the **dry-run command plan** from Phase 3 (so the reviewer sees the exact
      Modal commands),
    - a verification note (what the `verifications` block will check),
    - a one-line "execute with `/run-lora-execute <PR#>` after merge" pointer.
-4. **Stop. Do not merge.** Print the PR URL and hand back to the user.
+4. Push the branch as part of PR creation. If this workflow created temporary
+   git worktrees, remove only those worktrees after the PR exists and only
+   after confirming they contain no uncommitted work needed for the PR.
+5. **Stop. Do not merge.** Print the PR URL and hand back to the user.
 
 ## Guardrails (non-negotiable)
 
@@ -145,4 +204,6 @@ Write `configs/aft_runs/<name>.json`. Requirements:
 - Never merge the PR. Opening it and stopping is the whole job.
 - Pin every hyperparameter explicitly in the config; never rely on the Modal
   CLI defaults to fill them in silently.
+- Ask for GPU count/type and HF adapter/eval upload destinations; never infer
+  them silently.
 - Validate against the live registries, not from memory.
