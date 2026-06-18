@@ -27,6 +27,13 @@ The shared skills live in `.claude/skills/` and are loaded at session startup
   markdown report with executive summary
 - `vault-capture` - write durable project memory (STATE.md + session note) into dohun_vault
 - `vault-load` - onboard from dohun_vault with progressive, manifest-first loading
+- `run-lora-training` - author an AFT/stacked-LoRA training recipe and open a PR
+  for review (interview -> validated `configs/aft_runs/*.json` -> dry-run -> PR;
+  spends nothing, never merges). Targets the `midtraining_generalization` repo.
+- `run-lora-execute` - execute a reviewed recipe PR on Modal: resolve the merged
+  main SHA as `--git-ref`, preview the plan + rough cost, confirm before every
+  paid step, run training + HF verification, then optionally the eval/plot
+  pipeline. Targets the `midtraining_generalization` repo.
 
 ### Codex sync
 
@@ -37,8 +44,8 @@ copy (this repo) and no drift. On a fresh machine, run:
 bash scripts/link-codex-skills.sh
 ```
 
-This points `~/.codex/skills/{vault-load,vault-capture,code-redteam}` at the
-repo's `.claude/skills/` dirs (idempotent; backs up any existing real dirs).
+This points `~/.codex/skills/{vault-load,vault-capture,code-redteam,run-lora-training,run-lora-execute}`
+at the repo's `.claude/skills/` dirs (idempotent; backs up any existing real dirs).
 Restart Codex afterward to pick up the skills.
 
 ## Local State
