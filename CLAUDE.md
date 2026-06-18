@@ -30,6 +30,9 @@ environments, caches, or secrets to this repo.
 
 - `code-redteam` - adversarial red-team review of a code file: research-validity
   findings ranked by severity, parameter/silent-choice inventory, MD report.
+  Reviews any file, but defaults its report output to the gitignored
+  `redteam/` folder in `midtraining_generalization` (falls back to the
+  target's directory if that repo isn't found).
 - `vault-capture` - write project memory (STATE.md + session note) into dohun_vault.
 - `vault-load` - progressive, manifest-first onboarding from dohun_vault.
 - `run-lora-training` - author an AFT/stacked-LoRA training recipe + open a PR
@@ -40,7 +43,9 @@ environments, caches, or secrets to this repo.
 The `run-lora-*` pair is an intentional exception to the "keep commands generic"
 rule below: they live here for cross-agent discoverability but target one repo,
 so they locate `projects/midtraining_generalization` at runtime rather than
-assuming the cwd.
+assuming the cwd. `code-redteam` is a milder case of the same exception — it
+reviews any file, but defaults its report output into that repo's gitignored
+`redteam/` folder, locating the repo the same runtime way.
 
 These skills are the single canonical copy. Codex consumes them via symlink
 (`~/.codex/skills/{vault-load,vault-capture,code-redteam,run-lora-training,run-lora-execute}` → `.claude/skills/...`), set up by

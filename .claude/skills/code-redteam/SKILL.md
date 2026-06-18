@@ -78,8 +78,10 @@ fallbacks live here:
   the repo's README; state the inferred purpose as an explicit assumption in
   the report so a wrong guess is visible.
 - **Risk areas:** assume full red-team across all areas and say so.
-- **Report location (Phase 4):** use the default path. If the invoker
-  explicitly requested an output path, that always wins over the default.
+- **Report location (Phase 4):** use the default path (the
+  `midtraining_generalization/redteam/` folder described in Phase 4). If the
+  invoker explicitly requested an output path, that always wins over the
+  default.
 
 ## Phase 3: Adversarial Analysis
 
@@ -151,8 +153,19 @@ enters the mean at line 102, deflating similarity scores" is.
      and reproducibility debt.
 
 10. Ask the user where to save the report (default:
-    `<same-directory-as-target>/<NAME>_REDTEAM.md`; non-interactive rules
-    are in the "Non-interactive mode" section above).
+    `<midtraining_generalization>/redteam/<NAME>_REDTEAM.md`; non-interactive
+    rules are in the "Non-interactive mode" section above).
+
+    The default lives in a gitignored `redteam/` folder at the root of the
+    `midtraining_generalization` project, regardless of where the reviewed
+    target file lives. Locate that root the same way the `run-lora-*` skills
+    do: use the current directory if it is that repo, else
+    `projects/midtraining_generalization/` beneath the workspace root (do not
+    hardcode the `/mnt/...` prefix — the mount name differs per machine).
+    Create `redteam/` if it does not exist. If the project cannot be located
+    (e.g. reviewing a file in an unrelated repo), fall back to
+    `<same-directory-as-target>/<NAME>_REDTEAM.md` and say so. An
+    invoker-supplied output path always wins.
 
 11. Write the markdown report with EXACTLY this structure:
 
