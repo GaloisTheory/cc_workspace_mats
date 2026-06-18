@@ -1,15 +1,31 @@
 ---
 name: run-lora-execute
-description: Execute a reviewed AFT / stacked-LoRA training recipe on Modal. Takes a recipe PR (number) or a configs/aft_runs/*.json path, resolves the merged main commit as the Modal --git-ref, shows the resolved --execute plan plus a rough GPU cost estimate, waits for an explicit in-session confirmation, then runs training and HF verification. It asks whether to continue through evals, grading, aggregation, HF uploads, plotting, and a final PR/push of source-config/plot changes; the default answer is yes, but every paid or irreversible stage remains gated. Spends real money, so every paid step is gated. Use when the user wants to actually run / launch / kick off a recipe on Modal, execute a merged training PR, or continue the post-training eval/plot pipeline. The sibling /run-lora-training authors the recipe and PR; this skill runs it.
+description: >-
+  Execute a reviewed AFT / stacked-LoRA training recipe on Modal. Takes a recipe
+  PR (number) or a configs/aft_runs/*.json path, resolves the merged main commit
+  as the Modal --git-ref, shows the resolved --execute plan plus a rough GPU
+  cost estimate, HF write destinations, grader/payment notes, and plotting
+  outputs, then asks for one explicit in-session launch authorization covering
+  the selected pipeline. Once authorized, keep running through the approved
+  steps by default: training, HF verification, evals, grading, aggregation, HF
+  uploads/pins, plotting, and any approved final PR/push. Stop only on failure,
+  plan/cost/destination drift, missing config support, or work outside the
+  approved scope. Use when the user wants to actually run / launch / kick off a
+  recipe on Modal, execute a merged training PR, or continue the post-training
+  eval/plot pipeline. The sibling /run-lora-training authors the recipe and PR;
+  this skill runs it.
 ---
 
 # Run LoRA Execute — Recipe Execution
 
 The **back half** of the workflow. Input is a recipe that has already been
 authored and reviewed (ideally merged) via `/run-lora-training`. This skill
-resolves provenance, previews the real commands, **confirms before every paid
-Modal step**, then executes. It costs real GPU money and writes to a shared HF
-repo, so the confirmation gates are mandatory, not optional.
+resolves provenance, previews the real commands and write destinations, gets
+one explicit launch authorization for the selected scope, then executes
+continuously through the approved pipeline. It costs real GPU / grader money
+and writes to shared HF repos, so the launch authorization must be concrete and
+in-session; after that, do not add per-stage confirmation gates for work that
+was already previewed and approved.
 
 The runner is `tools/run_aft_recipe.py`. Steps it understands (via `--step`):
 `train`, `verify`, `eval`, `grade`, `aggregate`, `upload`, `plot`. Selection
@@ -17,9 +33,18 @@ can also be narrowed with `--job <id>`.
 
 Default automation scope: ask the user whether to run the whole downstream
 pipeline after training (`eval` -> `grade` -> `aggregate` -> `upload` ->
-`plot`) and recommend yes when those sections exist in the recipe. This is a
-scope decision, not spend authorization: still confirm before each paid Modal
-stage, paid grader call, irreversible HF upload, and final PR/push.
+`plot`) and recommend yes when those sections exist in the recipe. Treat this
+as both scope selection and spend/write authorization only after the dry-run
+preview has shown the exact command set, resolved SHA, rough upper-bound GPU
+cost, grader/payment notes, HF destinations, upload/pin behavior, plot keys,
+and optional final PR/push behavior. A single "go" can authorize all previewed
+paid and irreversible stages; do not re-confirm them one by one.
+
+Goal-backed runs: if the user explicitly asks to run this as a Codex goal,
+create a goal after launch authorization with an objective such as "Run
+`<config>` at `<SHA>` through train/verify/eval/grade/aggregate/upload/plot and
+produce pinned sources plus figures." Then keep resuming until the authorized
+pipeline is complete or a real blocker requires user input.
 
 ## Phase 0: Locate the repo, resolve input + provenance
 
@@ -36,10 +61,14 @@ operations from there.
    PR, find the changed `configs/aft_runs/*.json` via `gh pr view <n> --json files`.
 2. Determine the Modal `--git-ref` — **provenance matters because Modal clones
    the repo at this ref and runs that code, not your working tree:**
-   - Preferred: the PR is **merged**. Use the merge commit / current `main` SHA
-     (`gh pr view <n> --json mergeCommit,merged,state`, or
-     `git rev-parse origin/main` after `git fetch`). This is the intended path —
-     the recorded ref is exactly what was reviewed and merged.
+   - Preferred: the PR is **merged**. For a PR input, use that PR's exact
+     `mergeCommit.oid` from `gh pr view <n> --json mergeCommit,merged,state`.
+     Do **not** substitute the current `origin/main` SHA if main has advanced
+     after the PR merge; the recorded ref should be exactly what was reviewed
+     and merged.
+   - For a config-path input with no PR number, `git fetch` and use current
+     `origin/main` only after verifying the config exists at that SHA and the
+     user wants latest merged main. Otherwise ask for a PR number or explicit SHA.
    - If the PR is **not merged**, warn clearly that artifacts will reference an
      unmerged commit, and ask the user whether to (a) wait for merge
      [recommended], or (b) proceed against the PR branch head SHA. Only proceed
@@ -50,20 +79,65 @@ operations from there.
    PYTHONPATH=src uv run python -c "from tools import run_aft_recipe as r; rec=r.load_recipe('<config>'); r.validate_recipe(rec); print('OK')"
    ```
    A validation failure aborts the run.
-4. Inspect the recipe's `gpu`, `push_hf`, `export_root`, `uploads`, and
-   `plots` fields. Confirm the recorded GPU type/count and Hugging Face
-   destinations with the user instead of silently accepting surprising values.
-   Adapter uploads go to `GaloisTheory123/MSM-hillclimb`; eval uploads use
+4. Inspect the recipe's `gpu`, `distributed_backend`/`num_processes`, `push_hf`,
+   `export_root`, `overwrite_hf`, `uploads`, and `plots` fields. Surface the
+   recorded GPU type/count (and DDP world size), Hugging Face destinations, and
+   any `overwrite_hf: true` job in the launch preview instead of silently
+   accepting surprising values. Adapter uploads go to
+   `GaloisTheory123/MSM-hillclimb`; eval uploads use
    `configs/eval_results_sources.json` (default dataset repo
    `GaloisTheory123/MSM_activations`).
+5. Before authorization, do a recipe-wide HF adapter destination check for all
+   `push_hf: true` training jobs. The Modal launcher checks one training
+   invocation before spawning its remote jobs, but the recipe runner may execute
+   multiple training jobs sequentially, so the skill must catch cross-job
+   duplicate destinations and existing remote files up front. Use the live
+   recipe after defaults are applied:
+   ```
+   PYTHONPATH=.:src uv run --with huggingface_hub python - <<'PY'
+   from collections import Counter
+   from tools import run_aft_recipe as r
+   from modal_scripts.train_stacked_lora_aft_modal import planned_hf_output_subfolders
+   from msm_eval.training.stacked_lora_aft import HF_REPO, assert_hf_paths_available, ensure_repos
 
-## Phase 1: Preview the real plan (still no spend)
+   rec = r.load_recipe("<config>")
+   paths = []
+   check_existing = []
+   for job in rec.get("training", []):
+       if not job.get("push_hf"):
+           continue
+       configs = job.get("lora_configs") or [job["lora_config"]]
+       planned = planned_hf_output_subfolders(
+           configs=configs,
+           variants=job["source_model_variants"],
+           export_root=job["export_root"],
+           combined_checkpoint_epochs=job.get("combined_checkpoint_epochs", []),
+       )
+       paths.extend(planned)
+       if not job.get("overwrite_hf", False):
+           check_existing.extend(planned)
+   dupes = sorted(path for path, count in Counter(paths).items() if count > 1)
+   if dupes:
+       raise SystemExit("duplicate HF adapter output path(s) across recipe jobs:\n" + "\n".join(dupes))
+   if check_existing:
+       ensure_repos([HF_REPO])
+       assert_hf_paths_available(HF_REPO, check_existing)
+   print("HF adapter destinations available:", *paths, sep="\n")
+   PY
+   ```
+   If this fails, stop before spending. Do not work around collisions by adding
+   `overwrite_hf`; replacing artifacts must be an explicit recipe-author choice.
+
+## Phase 1: Preview + authorize the real plan (still no spend)
 
 1. Ask the downstream scope question before previewing. Default: include
    `train`, `verify`, and all recipe-defined `eval`, `grade`, `aggregate`,
    `upload`, and `plot` steps. If the user declines, preview only the selected
-   steps. If a desired downstream section is absent from the recipe, stop and
-   explain that the recipe needs a config/code PR before execution.
+   steps. A recipe that intentionally defines only `train` + `verifications`
+   (e.g. the plain-text MSM no-adapter recipe) is a **complete, valid scope** —
+   run it as train+verify and do not treat the absent downstream sections as an
+   error. Only stop and explain that the recipe needs a config/code PR when the
+   user *wants* a downstream step that the recipe does not define.
 2. Dry-run with the **resolved SHA** and write a manifest for the record:
    ```
    PYTHONPATH=src uv run python tools/run_aft_recipe.py <config> --dry-run --git-ref <SHA> --step train --step verify --manifest-out results/manifests/<name>_train.json
@@ -73,19 +147,46 @@ operations from there.
    - the exact `--execute` command(s) that will run,
    - the resolved `--git-ref` SHA and the PR/merge status,
    - a **rough cost estimate**: GPU type (default H100) × number of Modal jobs
-     × the per-job `timeout` cap (default 7200s = 2h is a ceiling, not the
-     expected runtime) — state explicitly that it's an upper-bound guess,
+     × **GPUs per job** × the per-job `timeout` cap — state explicitly that it's
+     an upper-bound guess. GPUs per job is the count in the `gpu` string
+     (`H100:4` → 4, bare `H100` → 1) and equals `num_processes` for DDP runs; a
+     DDP job is **one container holding N GPUs**, billed per-GPU for the whole
+     wall-time, so a 4-GPU job costs ~4× a 1-GPU job at the same timeout. Use the
+     recipe's actual `timeout` (it may exceed the 7200s/2h default — the MSM
+     plain-text recipe uses 21600s/6h), and remember the cap is a ceiling, not
+     the expected runtime.
+   - whether grading may call a paid grader/LLM, and any visible chunk/job
+     count or config-driven bound,
    - whether `push_hf` is on (writes adapters to
-     `GaloisTheory123/MSM-hillclimb`, may overwrite existing artifacts),
+     `GaloisTheory123/MSM-hillclimb`). The Phase-0 recipe-wide HF check should
+     have confirmed that planned non-overwrite adapter paths are empty and that
+     no two recipe jobs share an output path. The Modal launcher also runs a
+     per-invocation HF pre-flight before spawning remote training. The exception
+     is `overwrite_hf: true` on a job, which **does** replace existing artifacts:
+     call that out as an irreversible action in the authorization when any job
+     sets it,
    - eval upload destinations: each `source_key`, resolved HF dataset path,
      and whether its revision is already pinned or still `PIN_AFTER_UPLOAD`,
-   - plot keys and output directories.
+   - plot keys and output directories,
+   - whether the final commit/push/PR is included in the authorized scope.
+4. Ask for one explicit in-session launch authorization. The prompt should
+   name the approved scope and the known paid/irreversible actions, for
+   example: "Go to run train -> verify -> eval -> grade -> aggregate -> upload
+   -> plot at `<SHA>`, with the upper-bound GPU estimate above, possible paid
+   grader calls, HF writes to `<destinations>`, and final PR/push included?"
+   If the user says yes, continue through all approved stages without further
+   confirmation prompts.
+5. If the user gives a budget cap or excludes a stage, record that boundary in
+   your working notes and stop before crossing it. If no hard cap is given,
+   treat the previewed upper-bound estimate as an informational ceiling, not a
+   spend limit.
 
-## Phase 2: Train (gated)
+## Phase 2: Train (authorized)
 
-1. **Require an explicit in-session "go"** from the user before the first paid
-   step. A prior approval (e.g. merging the PR) is **not** consent to spend —
-   ask here, every time.
+1. Require the Phase 1 launch authorization before the first paid step. A
+   prior approval (e.g. merging the PR) is not consent to spend. Once the
+   Phase 1 "go" covers training, do not ask again before starting the train
+   step.
 2. Run training, scoped to the train step (and a specific `--job` if the user
    wants only one):
    ```
@@ -100,27 +201,37 @@ operations from there.
    ```
    This checks that every expected adapter file exists on HF and that the
    recorded metadata (seed, epochs, lora_config_name, dataset_*, and the pinned
-   hyperparameters) matches the recipe. Report pass/fail explicitly. Note that
+   hyperparameters) matches the recipe. For plain_text/DDP recipes this also
+   covers `dataset_format`, `text_field`, `packing`, `block_size`,
+   `distributed_backend`, `world_size`, and `global_effective_batch_size` when
+   the recipe's verification artifacts record them. Report pass/fail explicitly.
+   Note that
    verification checks **metadata identity, not weight hashes or final loss** —
    if the user needs bitwise/loss-level confirmation (e.g. reproducing a prior
    run), do that separately and say so.
 
-## Phase 3: Downstream pipeline (default yes, each stage gated)
+## Phase 3: Downstream pipeline (default yes, authorized continuous run)
 
 Run this phase if the user accepted the downstream scope question (default yes)
 or explicitly asks to continue past training. Run in dependency order,
-**confirming before each paid or irreversible stage** and stopping on failure:
+without per-stage confirmation prompts for stages included in the Phase 1
+authorization. Stop on failure or if a step would exceed the approved scope:
 
-- `--step eval` — paid Modal generation. Gate + cost note.
-- `--step grade` — local grading chunks (may call a paid grader/LLM; check).
+- `--step eval` — paid Modal generation, covered by launch authorization when
+  it was previewed and approved.
+- `--step grade` — local grading chunks. Check whether this may call a paid
+  grader/LLM; if that was not included in the launch preview, stop and ask for
+  updated authorization before grading.
 - `--step aggregate` — local aggregation.
 - `--step upload` — **irreversible**: pushes eval results to HF under the
-  recipe's `source_key`s. Gate explicitly; name the destination. Capture the
+  recipe's `source_key`s. Proceed without another gate only when the launch
+  authorization explicitly named the destination repo/source keys. Capture the
   commit SHA printed by `tools/upload_hf_folder.py` for each source key.
 - Pin uploaded eval sources. After upload, update
   `configs/eval_results_sources.json`, replacing each uploaded source's
-  `PIN_AFTER_UPLOAD` (or stale revision, after confirming) with the concrete
-  dataset commit SHA printed by the upload helper. Do this before plotting.
+  `PIN_AFTER_UPLOAD` with the concrete dataset commit SHA printed by the upload
+  helper. If replacing a stale concrete revision that was not previewed, stop
+  and ask before changing it. Do this before plotting.
 - Prepare plotting. All new/changed plotting must be implemented in
   `tools/eval_results_plotting.py`, following its existing conventions:
   declare source-backed plot specs, download CSVs from Hugging Face through
@@ -132,17 +243,19 @@ or explicitly asks to continue past training. Run in dependency order,
 - `--step plot` — local figure generation into `notebooks/figures/...`, using
   the pinned HF sources above.
 
-Prefer running one stage, confirming its output looks right, then proceeding —
-rather than firing the whole chain blind. Write a manifest (`--manifest-out`)
-for each executed stage so there's a durable record of exactly what ran at
-which SHA.
+Run one stage at a time, stream/report progress, inspect failures, and then
+continue automatically to the next authorized stage. Write a manifest
+(`--manifest-out`) for each executed stage so there's a durable record of
+exactly what ran at which SHA.
 
-## Phase 4: Final PR / cleanup (default yes, gated)
+## Phase 4: Final PR / cleanup (default yes, launch-authorized)
 
-After the run and plots are complete, show the user the local diff and ask for
-explicit confirmation to commit, push, and open a PR. Default recommendation:
-yes, if there are source-config pins, plotting-code changes, generated figures,
-or manifests that should be reviewed.
+After the run and plots are complete, inspect the local diff. If the Phase 1
+launch authorization included final commit/push/PR and the diff contains only
+the expected source-config pins, plotting-code changes, generated figures, and
+manifests, proceed without another confirmation. If final PR/push was not
+included in the approved scope, or the diff contains surprising files, stop and
+ask before committing.
 
 1. Create or switch to a `codex/...` branch; never commit on `main`.
 2. Include only intentional artifacts: usually `configs/eval_results_sources.json`
@@ -153,7 +266,7 @@ or manifests that should be reviewed.
    The PR body should summarize the executed SHA, Modal steps, HF upload
    destinations + pinned revisions, plot keys, and output figure paths.
 4. Delete only temporary git worktrees that this workflow created, and only
-   after confirming they have no uncommitted work needed for the PR. Never
+   after verifying they have no uncommitted work needed for the PR. Never
    delete user-created or ambiguous worktrees.
 
 ## Phase 5: Report
@@ -165,8 +278,15 @@ removed. Link the Modal app URL(s) from the run output.
 
 ## Guardrails (non-negotiable)
 
-- **Confirm before every paid step**, every time, in-session. Merging the PR is
-  authorization to *consider* running, not to spend.
+- Require one explicit in-session launch authorization after the dry-run
+  preview and before the first paid or irreversible step. Merging the PR is
+  authorization to *consider* running, not to spend. Once the launch
+  authorization covers a paid/irreversible stage, do not ask again before that
+  stage.
+- Stop and ask for updated authorization if the command set, git SHA, GPU
+  type/count, timeout, estimated paid scope, grader behavior, HF destination,
+  upload source key, final PR/push scope, or budget boundary differs from what
+  the user approved.
 - Always run against a concrete resolved SHA, defaulting to the merged `main`
   commit. Warn loudly if running against an unmerged branch.
 - Never merge or close PRs. If the PR isn't merged and the user wants the clean
@@ -175,9 +295,12 @@ removed. Link the Modal app URL(s) from the run output.
 - On any Modal failure, stop and report — never paper over a failed job or
   continue to dependent steps.
 - Don't disable `push_hf` or change recipe values on the fly to "make it work";
-  if the recipe is wrong, send the user back to `/run-lora-training`.
-- Do not silently choose GPU count/type or Hugging Face destinations; confirm
-  what the recipe records before spend.
+  if the recipe is wrong, send the user back to `/run-lora-training`. In
+  particular, if the HF pre-flight aborts on an `export_root` collision, **do
+  not** add `--overwrite-hf` or set `overwrite_hf` to force it — stop and report;
+  replacing artifacts is the recipe author's explicit decision, not a workaround.
+- Do not silently choose GPU count/type or Hugging Face destinations; include
+  what the recipe records in the launch authorization before spend.
 - Do not plot from local eval outputs. Plot by updating
   `tools/eval_results_plotting.py` and `configs/eval_results_sources.json` so
   figures are reproducible from pinned Hugging Face uploads.
