@@ -6,7 +6,7 @@ description: >-
   as the Modal --git-ref, shows the resolved --execute plan plus a rough GPU
   cost estimate, HF write destinations, grader/payment notes, plotting outputs,
   and the default parallel train fan-out/logging plan, then asks for one
-  explicit in-session launch authorization covering the selected pipeline. Once
+  explicit in-session launch authorization covering the full default pipeline. Once
   authorized, keep running through the approved steps by default: training, HF
   verification, evals, grading, aggregation, HF uploads/pins, plotting, and any
   approved final PR/push. Stop only on failure, plan/cost/destination drift,
@@ -21,7 +21,7 @@ description: >-
 The **back half** of the workflow. Input is a recipe that has already been
 authored and reviewed (ideally merged) via `/run-lora-training`. This skill
 resolves provenance, previews the real commands and write destinations, gets
-one explicit launch authorization for the selected scope, then executes
+one explicit launch authorization for the full default scope, then executes
 continuously through the approved pipeline. It costs real GPU / grader money
 and writes to shared HF repos, so the launch authorization must be concrete and
 in-session; after that, do not add per-stage confirmation gates for work that
@@ -35,14 +35,19 @@ default. Use `--train-concurrency N` to bound fan-out, `--log-dir <dir>` to
 capture per-action logs, and `--serial-train` only when the user explicitly
 wants serialized training.
 
-Default automation scope: ask the user whether to run the whole downstream
-pipeline after training (`eval` -> `grade` -> `aggregate` -> `upload` ->
-`plot`) and recommend yes when those sections exist in the recipe. Treat this
-as both scope selection and spend/write authorization only after the dry-run
-preview has shown the exact command set, resolved SHA, rough upper-bound GPU
-cost, grader/payment notes, HF destinations, upload/pin behavior, plot keys,
-and optional final PR/push behavior. A single "go" can authorize all previewed
-paid and irreversible stages; do not re-confirm them one by one.
+Default automation scope is the **full pipeline**: `train` -> `verify` ->
+`eval` -> `grade` -> `aggregate` -> `upload` -> `plot`, plus the final PR/push,
+whenever the recipe defines those sections. Do not ask a separate "which steps?"
+scope question — preview the full default scope and let the user narrow it only
+if they say so in their one reply. There is exactly **one** authorization gate:
+the user's "go," which can be given upfront in the invocation or in response to
+the dry-run preview. The preview always prints (exact command set, resolved
+SHA, rough upper-bound GPU cost, grader/payment notes, HF destinations,
+upload/pin behavior, plot keys, and final PR/push behavior); the "go" authorizes
+**all** of it. After the go, run the whole loop end to end with **no further
+confirmation prompts** — stop only on the objective conditions below (validation
+failure, HF collision, unmerged ref, Modal failure, or drift from what was
+previewed).
 
 Goal-backed runs: if the user explicitly asks to run this as a Codex goal,
 create a goal after launch authorization with an objective such as "Run
@@ -138,10 +143,11 @@ operations from there.
 
 ## Phase 1: Preview + authorize the real plan (still no spend)
 
-1. Ask the downstream scope question before previewing. Default: include
+1. Do not ask a separate scope question. Default scope is the full pipeline:
    `train`, `verify`, and all recipe-defined `eval`, `grade`, `aggregate`,
-   `upload`, and `plot` steps. If the user declines, preview only the selected
-   steps. A recipe that intentionally defines only `train` + `verifications`
+   `upload`, and `plot` steps, plus the final PR/push. Preview that full scope;
+   the user narrows it only if they say so in the same reply that authorizes the
+   run. A recipe that intentionally defines only `train` + `verifications`
    (e.g. the plain-text MSM no-adapter recipe) is a **complete, valid scope** —
    run it as train+verify and do not treat the absent downstream sections as an
    error. Only stop and explain that the recipe needs a config/code PR when the
@@ -182,13 +188,21 @@ operations from there.
      and whether its revision is already pinned or still `PIN_AFTER_UPLOAD`,
    - plot keys and output directories,
    - whether the final commit/push/PR is included in the authorized scope.
-4. Ask for one explicit in-session launch authorization. The prompt should
-   name the approved scope and the known paid/irreversible actions, for
-   example: "Go to run train -> verify -> eval -> grade -> aggregate -> upload
-   -> plot at `<SHA>`, with the upper-bound GPU estimate above, possible paid
-   grader calls, HF writes to `<destinations>`, and final PR/push included?"
-   If the user says yes, continue through all approved stages without further
-   confirmation prompts.
+4. Get one explicit in-session launch authorization — this is the **only** gate
+   in the run. It can arrive two ways:
+   - **Upfront in the invocation** (e.g. `/run-lora-execute 71 go`, "just run
+     the whole thing"). If it has, still print the dry-run preview as a
+     non-blocking record, then proceed straight into execution without asking
+     again.
+   - **In response to the preview.** Otherwise, show the preview and ask one
+     question that names the full default scope and every known paid/irreversible
+     action in one shot, for example: "Go to run train -> verify -> eval ->
+     grade -> aggregate -> upload -> plot at `<SHA>`, with the upper-bound GPU
+     estimate above, possible paid grader calls, HF writes to `<destinations>`,
+     and final PR/push included?"
+   Either way, once authorized run the entire pipeline end to end without any
+   further confirmation prompts. Do not re-ask before grade, upload, pin, plot,
+   or the final PR — they are all inside this one authorization.
 5. If the user gives a budget cap or excludes a stage, record that boundary in
    your working notes and stop before crossing it. If no hard cap is given,
    treat the previewed upper-bound estimate as an informational ceiling, not a
@@ -234,26 +248,33 @@ operations from there.
 
 ## Phase 3: Downstream pipeline (default yes, authorized continuous run)
 
-Run this phase if the user accepted the downstream scope question (default yes)
-or explicitly asks to continue past training. Run in dependency order,
-without per-stage confirmation prompts for stages included in the Phase 1
-authorization. Stop on failure or if a step would exceed the approved scope:
+Run this phase by default — it is part of the full default scope unless the
+user narrowed it in their authorization reply. Run in dependency order, with no
+per-stage confirmation prompts: every stage here is inside the single Phase 1
+authorization. Stop only on failure, or if a step would exceed the scope the
+user actually authorized:
 
 - `--step eval` — paid Modal generation, covered by launch authorization when
   it was previewed and approved.
-- `--step grade` — local grading chunks. Check whether this may call a paid
-  grader/LLM; if that was not included in the launch preview, stop and ask for
-  updated authorization before grading.
+- `--step grade` — local grading chunks. Paid grader/LLM behavior must be
+  surfaced in the Phase 1 preview, so it is already inside the launch
+  authorization; proceed without re-asking. Stop only if grading would call a
+  paid grader the preview did not disclose (that is preview drift, not a routine
+  gate).
 - `--step aggregate` — local aggregation.
 - `--step upload` — **irreversible**: pushes eval results to HF under the
-  recipe's `source_key`s. Proceed without another gate only when the launch
-  authorization explicitly named the destination repo/source keys. Capture the
-  commit SHA printed by `tools/upload_hf_folder.py` for each source key.
+  recipe's `source_key`s. The Phase 1 preview names these destination
+  repo/source keys, so the launch authorization already covers them — proceed
+  without another gate. Capture the commit SHA printed by
+  `tools/upload_hf_folder.py` for each source key. Stop only if a resolved
+  destination differs from what the preview showed.
 - Pin uploaded eval sources. After upload, update
   `configs/eval_results_sources.json`, replacing each uploaded source's
   `PIN_AFTER_UPLOAD` with the concrete dataset commit SHA printed by the upload
-  helper. If replacing a stale concrete revision that was not previewed, stop
-  and ask before changing it. Do this before plotting.
+  helper — this is the normal flow and needs no confirmation. The one exception
+  is overwriting an *already-concrete* revision the preview did not mention:
+  that is a surprising change, so stop and report it rather than silently
+  rewriting the pin. Do this before plotting.
 - Prepare plotting. All new/changed plotting must be implemented in
   `tools/eval_results_plotting.py`, following its existing conventions:
   declare source-backed plot specs, download CSVs from Hugging Face through
@@ -272,12 +293,13 @@ exactly what ran at which SHA.
 
 ## Phase 4: Final PR / cleanup (default yes, launch-authorized)
 
-After the run and plots are complete, inspect the local diff. If the Phase 1
-launch authorization included final commit/push/PR and the diff contains only
-the expected source-config pins, plotting-code changes, generated figures, and
-manifests, proceed without another confirmation. If final PR/push was not
-included in the approved scope, or the diff contains surprising files, stop and
-ask before committing.
+After the run and plots are complete, inspect the local diff. Final
+commit/push/PR is part of the default scope (unless the user excluded it in
+their one authorization reply), so the Phase 1 go already covers it: if the diff
+contains only the expected source-config pins, plotting-code changes, generated
+figures, and manifests, proceed and open the PR without another confirmation.
+Stop and ask only if the diff contains surprising files (anything beyond those
+expected artifacts) — that is the objective guardrail, not a routine gate.
 
 1. Create or switch to a `codex/...` branch; never commit on `main`.
 2. Include only intentional artifacts: usually `configs/eval_results_sources.json`
