@@ -1,16 +1,18 @@
 ---
 name: run-lora-training
 description: >-
-  Author a new AFT / stacked-LoRA training recipe and open a PR for review.
+  Author a new AFT / stacked-LoRA training recipe, MSM raw continued-midtraining
+  recipe, or ordered raw-MSM-to-AFT recipe bundle and open a PR for review.
   Interviews you for the dataset, LoRA config, source variants, seeds, GPU
   type/count, Hugging Face adapter/eval upload layout, downstream eval/plot
-  scope, and hyperparameters; generates a validated configs/aft_runs/*.json
-  recipe; runs the recipe runner in --dry-run to show the exact Modal commands;
-  then opens a PR and stops. Spends no money and never runs Modal. Use when the
-  user wants to set up / launch / kick off a new LoRA or AFT training run, add a
-  new dataset/config to train on, create a new run recipe, or "run LORA
-  training". The sibling /run-lora-execute takes the merged PR and actually runs
-  it on Modal.
+  scope, dependency map, and hyperparameters; generates validated
+  configs/aft_runs/*.json and/or configs/msm_run/*.json recipes; runs the recipe
+  runner in --dry-run to show the exact Modal commands; then opens a PR and
+  stops. Spends no money and never runs Modal. Use when the user wants to set up
+  / launch / kick off a new LoRA, AFT, MSM raw, or chained MSM raw + instruct AFT
+  training run, add a new dataset/config to train on, create a new run recipe,
+  or "run LORA training". The sibling /run-lora-execute takes the merged PR and
+  actually runs it on Modal.
 ---
 
 # Run LoRA Training — Recipe Authoring
@@ -23,7 +25,10 @@ runs only after a human reviews and (per the user's preference) merges the PR.
 
 The recipe runner is `tools/run_aft_recipe.py`; recipes usually live in
 `configs/aft_runs/*.json`. MSM-specific plain-text sweeps may live in
-`configs/msm_run/*.json` when that existing family is the closest match.
+`configs/msm_run/*.json` when that existing family is the closest match. A
+future MSM workflow may need both files in one PR: first a raw continued-
+midtraining producer, then downstream instruct/AFT consumer recipes that read
+the produced adapters.
 Canonical templates by shape — read the one matching the run you are authoring
 before generating a new one:
 - chat-SFT AFT (assistant-token loss): `l7_r1_epoch3_seed_replicates.json`,
@@ -38,6 +43,12 @@ All commands assume the repo root of `midtraining_generalization` and the
 Never make silent resource or artifact-placement decisions. The recipe is the
 reviewable contract for GPU shape and Hugging Face destinations, so ask first
 and then write the agreed values explicitly.
+
+For chained MSM workflows, author the PR as a recipe bundle rather than an AFT
+recipe alone. The raw MSM recipe must train and verify the source adapters
+first; the downstream AFT recipe must consume only source variants that either
+already exist on Hugging Face or are produced by the raw recipe in the same PR.
+The PR body must show that dependency map.
 
 ## Phase 0: Locate the repo
 
@@ -87,6 +98,11 @@ the hardened schema).
 
 First agree on:
 
+- Workflow shape. Ask whether this is a standalone AFT/chat-SFT recipe, a
+  standalone raw MSM/plain-text recipe, or a chained raw MSM -> downstream AFT
+  bundle. For the chained case, write both the `configs/msm_run/*.json`
+  producer and the `configs/aft_runs/*.json` consumer in the same PR unless the
+  user explicitly says the raw artifacts already exist.
 - GPU resources and parallelism. Ask how many GPUs and what type. Default
   proposal: one `H100` (`gpu: "H100"`, single-process). Do not leave `gpu`
   implicit just because the schema allows it.
@@ -150,7 +166,8 @@ First agree on:
   aggregation, uploads, and plots in the recipe so `/run-lora-execute` can ask
   once about running the full pipeline and then gate paid/irreversible stages.
   If the user wants train-only, include verifications but omit the downstream
-  sections.
+  sections. For chained MSM, the raw recipe's normal scope is train+verify; the
+  downstream AFT recipe carries the eval/grade/aggregate/upload/plot scope.
 
 Collect, at minimum, for the **training** section (all required by the schema):
 
@@ -218,7 +235,8 @@ will reject it.
 
 ## Phase 2: Generate the config
 
-Write `configs/aft_runs/<name>.json`. Requirements:
+Write the recipe file(s): `configs/aft_runs/<name>.json`,
+`configs/msm_run/<name>.json`, or both for a chained MSM bundle. Requirements:
 
 - `name` matches the filename stem; include a one-line `description`.
 - Every training job carries **all** `TRAINING_REQUIRED_KEYS`; exactly one of
@@ -233,15 +251,22 @@ Write `configs/aft_runs/<name>.json`. Requirements:
   revision to pin after upload.
 - Job `id`s are unique across all sections.
 - Match the formatting/ordering conventions of the existing recipes.
+- For a chained MSM bundle, make the raw recipe's planned HF outputs line up
+  exactly with the downstream recipe's `source_model_variants`. Resolve those
+  variants through `CONDITIONS_BY_KEY` and verify each adapter-backed source has
+  an existing `adapter_subfolder` on HF or a planned producer output in this PR.
+  Include checkpoint aliases explicitly; for example an epoch-2 checkpoint
+  variant must point at the raw recipe's `msm_raw/epoch_02` output, not the final
+  adapter root.
 
 ## Phase 3: Validate + dry-run (no spend)
 
 1. Validate the schema. Either run the focused test suite or validate directly:
    ```
-   PYTHONPATH=src uv run python -c "from tools import run_aft_recipe as r; rec=r.load_recipe('configs/aft_runs/<name>.json'); r.validate_recipe(rec); print('OK')"
+   PYTHONPATH=src uv run python -c "from tools import run_aft_recipe as r; rec=r.load_recipe('<config>'); r.validate_recipe(rec); print('OK')"
    ```
-   Fix any `ValueError` before proceeding. A validation failure is a blocker,
-   not a warning.
+   Run this for every recipe in a bundle. Fix any `ValueError` before
+   proceeding. A validation failure is a blocker, not a warning.
 2. Run a no-spend HF adapter destination check for all `push_hf: true` training
    jobs. This catches duplicate output paths across separate recipe jobs before
    review; existing remote files should be handled by choosing a fresh
@@ -253,7 +278,7 @@ Write `configs/aft_runs/<name>.json`. Requirements:
    from modal_scripts.train_stacked_lora_aft_modal import planned_hf_output_subfolders
    from msm_eval.training.stacked_lora_aft import HF_REPO, assert_hf_paths_available, ensure_repos
 
-   rec = r.load_recipe('configs/aft_runs/<name>.json')
+   rec = r.load_recipe('<config>')
    paths = []
    check_existing = []
    for job in rec.get("training", []):
@@ -278,24 +303,29 @@ Write `configs/aft_runs/<name>.json`. Requirements:
    print("HF adapter destinations available:", *paths, sep="\n")
    PY
    ```
+   Run this for every recipe in a bundle and compare producer outputs against
+   downstream source-adapter requirements before review.
 3. Run the runner in dry-run for each step the recipe defines and capture the
    resolved commands verbatim:
    ```
-   PYTHONPATH=src uv run python tools/run_aft_recipe.py configs/aft_runs/<name>.json --dry-run --git-ref DRYRUNREF --step train --step verify
-   PYTHONPATH=src uv run python tools/run_aft_recipe.py configs/aft_runs/<name>.json --dry-run --git-ref DRYRUNREF --step train --step verify --step eval --step grade --step aggregate --step upload --step plot
+   PYTHONPATH=src uv run python tools/run_aft_recipe.py <config> --dry-run --git-ref DRYRUNREF --step train --step verify
+   PYTHONPATH=src uv run python tools/run_aft_recipe.py <config> --dry-run --git-ref DRYRUNREF --step train --step verify --step eval --step grade --step aggregate --step upload --step plot
    ```
    Use only the `--step` values actually present in the recipe; the first form
    is appropriate for train+verify recipes such as the plain-text MSM no-adapter
    recipe, while the second form is for full downstream recipes. The runner
    errors on absent selected steps. Use `--git-ref DRYRUNREF` as a placeholder —
-   the real ref is resolved by `/run-lora-execute` at run time.
+   the real ref is resolved by `/run-lora-execute` at run time. For chained MSM
+   bundles, dry-run the raw `configs/msm_run` recipe first as train+verify, then
+   dry-run the downstream `configs/aft_runs` recipe with its full scope.
 4. Show the user the dry-run plan and a short summary: how many train/eval/
    upload jobs, the GPU type/count, adapter `export_root`s, eval upload
    `source_key`s/HF paths, and that `push_hf` is on/off. If the recipe defines
    more than one training job, say that `/run-lora-execute` will run them in
    parallel by default with per-action logs unless the user chooses
-   `--serial-train` or a bounded `--train-concurrency N`. **Get the user's
-   explicit OK on the plan before opening the PR.**
+   `--serial-train` or a bounded `--train-concurrency N`. For bundles, include
+   the recipe execution order and producer -> consumer adapter dependency map.
+   **Get the user's explicit OK on the plan before opening the PR.**
 
 ## Phase 4: Branch + PR (stop here)
 
@@ -309,10 +339,14 @@ Write `configs/aft_runs/<name>.json`. Requirements:
    - what the run does (dataset, lora_config, variants, seeds, epochs),
    - the agreed GPU type/count,
    - the agreed HF adapter and eval upload layout,
+   - for a bundle, the ordered recipe list and dependency map from raw MSM
+     outputs to downstream AFT `source_model_variants`,
    - the **dry-run command plan** from Phase 3 (so the reviewer sees the exact
      Modal commands),
    - a verification note (what the `verifications` block will check),
-   - a one-line "execute with `/run-lora-execute <PR#>` after merge" pointer.
+   - a one-line "execute with `/run-lora-execute <PR#>` after merge" pointer;
+     for bundles, say this will execute raw train+verify before dependent AFT
+     stages.
 4. Push the branch as part of PR creation. If this workflow created temporary
    git worktrees, remove only those worktrees after the PR exists and only
    after confirming they contain no uncommitted work needed for the PR.
@@ -328,3 +362,6 @@ Write `configs/aft_runs/<name>.json`. Requirements:
 - Ask for GPU count/type and HF adapter/eval upload destinations; never infer
   them silently.
 - Validate against the live registries, not from memory.
+- For MSM raw -> AFT workflows, never author the downstream AFT recipe alone
+  unless the user explicitly says the raw adapters already exist and the
+  source-adapter preflight confirms that.
