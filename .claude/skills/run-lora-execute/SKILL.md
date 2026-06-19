@@ -1,19 +1,18 @@
 ---
 name: run-lora-execute
 description: >-
-  Execute a reviewed AFT / stacked-LoRA training recipe on Modal. Takes a recipe
-  PR (number) or a configs/aft_runs/*.json path, resolves the merged main commit
-  as the Modal --git-ref, shows the resolved --execute plan plus a rough GPU
-  cost estimate, HF write destinations, grader/payment notes, plotting outputs,
-  and the default parallel train fan-out/logging plan, then asks for one
-  explicit in-session launch authorization covering the full default pipeline. Once
-  authorized, keep running through the approved steps by default: training, HF
-  verification, evals, grading, aggregation, HF uploads/pins, plotting, and any
-  approved final PR/push. Stop only on failure, plan/cost/destination drift,
-  missing config support, or work outside the approved scope. Use when the user
-  wants to actually run / launch / kick off a recipe on Modal, execute a merged
-  training PR, or continue the post-training eval/plot pipeline. The sibling
-  /run-lora-training authors the recipe and PR; this skill runs it.
+  Execute reviewed AFT / stacked-LoRA recipes or raw-MSM-to-AFT recipe bundles
+  on Modal. Takes a PR number, configs/aft_runs/*.json path, or
+  configs/msm_run/*.json path; resolves the merged SHA; previews the --execute
+  plan, cost, HF destinations, source-adapter dependencies, Anthropic Haiku
+  judge, plot/upload outputs, and parallel train/eval logging; then asks for one
+  explicit launch authorization. Once authorized, runs approved producer
+  train/verify, dependent AFT train, eval, grade, aggregate, upload/pin, plot,
+  and final PR/push. Stop on failure, missing upstream artifacts,
+  plan/cost/destination drift, unsupported config, or scope drift. Use when the
+  user wants to run / launch / kick off a merged recipe PR, execute raw MSM +
+  downstream AFT, or continue the eval/plot pipeline. The sibling
+  /run-lora-training authors recipe PRs; this skill runs them.
 ---
 
 # Run LoRA Execute — Recipe Execution
@@ -30,10 +29,22 @@ was already previewed and approved.
 The runner is `tools/run_aft_recipe.py`. Steps it understands (via `--step`):
 `train`, `verify`, `eval`, `grade`, `aggregate`, `upload`, `plot`. Selection
 can also be narrowed with `--job <id>`.
-When multiple `train` actions are selected, the runner parallelizes them by
-default. Use `--train-concurrency N` to bound fan-out, `--log-dir <dir>` to
-capture per-action logs, and `--serial-train` only when the user explicitly
-wants serialized training.
+When multiple `train` or `eval` actions are selected, the runner parallelizes
+each set by default. Use `--train-concurrency N` / `--eval-concurrency N` to
+bound the respective fan-out, `--log-dir <dir>` to capture per-action logs
+(shared by both train and eval), and `--serial-train` / `--serial-eval` only
+when the user explicitly wants serialized execution. Eval fan-out is parallel
+by default — do not run eval jobs one `--job` at a time unless the user asks
+for serialized evals.
+
+The LLM judge that grades generations defaults in code to the OpenAI judge
+(`llm_judge_generation.DEFAULT_PROVIDER = "openai"`,
+`DEFAULT_MODEL = "gpt-5.4-mini"`), but this project's results and plot labels
+are "Anthropic Haiku judged." So this skill's default judge is **Anthropic
+Haiku** (`--judge-provider anthropic --judge-model claude-haiku-4-5-20251001`),
+run with **parallel concurrency** (e.g. `--concurrency 64` or higher), not the
+OpenAI default at the low default concurrency. Only use a different judge when
+the user explicitly asks for one.
 
 Default automation scope is the **full pipeline**: `train` -> `verify` ->
 `eval` -> `grade` -> `aggregate` -> `upload` -> `plot`, plus the final PR/push,
@@ -48,6 +59,13 @@ upload/pin behavior, plot keys, and final PR/push behavior); the "go" authorizes
 confirmation prompts** — stop only on the objective conditions below (validation
 failure, HF collision, unmerged ref, Modal failure, or drift from what was
 previewed).
+
+Recipe bundles are first-class. A PR may include a raw MSM producer recipe in
+`configs/msm_run/*.json` and a downstream AFT consumer recipe in
+`configs/aft_runs/*.json`. Treat that as one dependency-ordered execution plan:
+train and verify producer recipes first, then launch dependent AFT train/eval
+stages only after the source adapters exist. Never auto-select only the AFT
+recipe when the same PR also changes a likely producer recipe.
 
 Goal-backed runs: if the user explicitly asks to run this as a Codex goal,
 create a goal after launch authorization with an objective such as "Run
@@ -67,7 +85,13 @@ hardcode the `/mnt/...` prefix — the mount name differs per machine), else ask
 operations from there.
 
 1. Accept either a PR number (`/run-lora-execute 71`) or a config path. From a
-   PR, find the changed `configs/aft_runs/*.json` via `gh pr view <n> --json files`.
+   PR, collect changed `configs/msm_run/*.json` and `configs/aft_runs/*.json`
+   via `gh pr view <n> --json files`. If multiple recipes are present, build a
+   bundle instead of picking one file: order `configs/msm_run` raw producer
+   recipes before downstream `configs/aft_runs` consumers, and ask only if the
+   dependency order remains ambiguous after inspecting source variants and
+   planned HF paths. For an explicit config-path input, treat that one file as
+   the selected recipe unless the user supplied multiple paths.
 2. Determine the Modal `--git-ref` — **provenance matters because Modal clones
    the repo at this ref and runs that code, not your working tree:**
    - Preferred: the PR is **merged**. For a PR input, use that PR's exact
@@ -83,12 +107,12 @@ operations from there.
      [recommended], or (b) proceed against the PR branch head SHA. Only proceed
      on an explicit choice.
    - Resolve to a concrete 40-char SHA, never a moving ref like `main`.
-3. Re-validate the recipe before spending anything:
+3. Re-validate every selected recipe before spending anything:
    ```
    PYTHONPATH=src uv run python -c "from tools import run_aft_recipe as r; rec=r.load_recipe('<config>'); r.validate_recipe(rec); print('OK')"
    ```
    A validation failure aborts the run.
-4. Inspect the recipe's `gpu`, `distributed_backend`/`num_processes`, `push_hf`,
+4. Inspect each recipe's `gpu`, `distributed_backend`/`num_processes`, `push_hf`,
    `export_root`, `overwrite_hf`, `uploads`, and `plots` fields. Surface the
    recorded GPU type/count (and DDP world size), Hugging Face destinations, and
    any `overwrite_hf: true` job in the launch preview instead of silently
@@ -134,9 +158,22 @@ operations from there.
    print("HF adapter destinations available:", *paths, sep="\n")
    PY
    ```
-   If this fails, stop before spending. Do not work around collisions by adding
+   For bundles, repeat this for each selected recipe and aggregate planned
+   paths across the bundle so cross-recipe duplicate outputs are caught. If this
+   fails, stop before spending. Do not work around collisions by adding
    `overwrite_hf`; replacing artifacts must be an explicit recipe-author choice.
-6. Confirm the local Modal entrypoint environment can import `huggingface_hub`
+6. Do a downstream source-adapter preflight before authorization. For every
+   selected AFT consumer, inspect `source_model_variants` and resolve each key
+   through `CONDITIONS_BY_KEY` in `src/msm_eval/core/config.py`. A source with
+   no `adapter_subfolder` (for example `Llama_Pretrain_noadapter`) needs no HF
+   source artifact. Every other source adapter must already exist in
+   `GaloisTheory123/MSM-hillclimb`, or be produced by an earlier selected
+   recipe's planned outputs, including checkpoint aliases from
+   `combined_checkpoint_epochs` such as `checkpoint_epoch_02` under the raw
+   recipe's `msm_raw` output. If any required source is missing and not produced
+   earlier in the bundle, stop before spend; do not launch downstream AFT hoping
+   the raw MSM adapters appear later.
+7. Confirm the local Modal entrypoint environment can import `huggingface_hub`
    before a large launch. If `modal run` fails locally before remote spawn with
    a missing `huggingface_hub`, repair the Modal uv tool env once:
    `uv tool install modal==1.4.3 --with huggingface_hub==1.18.0 --force`.
@@ -156,9 +193,14 @@ operations from there.
    ```
    PYTHONPATH=src uv run python tools/run_aft_recipe.py <config> --dry-run --git-ref <SHA> --step train --step verify --manifest-out results/manifests/<name>_train.json
    ```
-   (Add the downstream steps the user wants to the same or a later preview.)
+   For a bundle, dry-run every selected recipe in dependency order with separate
+   manifest names. Preview raw MSM producer recipes as train+verify, then
+   preview downstream AFT recipes with their full recipe-defined scope. If a
+   producer dry-run was not shown, the user's "go" does not authorize that
+   producer spend.
 3. Show the user:
-   - the exact `--execute` command(s) that will run,
+   - the exact `--execute` command(s) that will run, grouped by recipe and
+     dependency order for bundles,
    - the resolved `--git-ref` SHA and the PR/merge status,
    - a **rough cost estimate**: GPU type (default H100) × number of Modal jobs
      × **GPUs per job** × the per-job `timeout` cap — state explicitly that it's
@@ -170,7 +212,11 @@ operations from there.
      plain-text recipe uses 21600s/6h), and remember the cap is a ceiling, not
      the expected runtime.
    - whether grading may call a paid grader/LLM, and any visible chunk/job
-     count or config-driven bound,
+     count or config-driven bound. State the judge this run will use: by
+     default the **Anthropic Haiku** judge
+     (`--judge-provider anthropic --judge-model claude-haiku-4-5-20251001`) at
+     parallel `--concurrency`, **not** the code-default OpenAI `gpt-5.4-mini`
+     judge. Call out explicitly if the user asked for a different judge,
    - whether `push_hf` is on (writes adapters to
      `GaloisTheory123/MSM-hillclimb`). The Phase-0 recipe-wide HF check should
      have confirmed that planned non-overwrite adapter paths are empty and that
@@ -184,9 +230,16 @@ operations from there.
      per-action logs will be written, and any `--train-concurrency N` bound.
      If no hard concurrency bound is needed, omit `--train-concurrency` and let
      the runner fan out all selected train actions,
+   - likewise, when more than one `eval` job is selected, that evals run in
+     parallel by default, where the per-action logs land, and any
+     `--eval-concurrency N` bound. Omit `--eval-concurrency` to fan out all
+     selected eval actions; only use `--serial-eval` if the user asked for
+     serialized evals,
    - eval upload destinations: each `source_key`, resolved HF dataset path,
      and whether its revision is already pinned or still `PIN_AFTER_UPLOAD`,
    - plot keys and output directories,
+   - for bundles, the producer -> consumer dependency map and the rule that
+     later recipes run only after earlier training and HF verification pass,
    - whether the final commit/push/PR is included in the authorized scope.
 4. Get one explicit in-session launch authorization — this is the **only** gate
    in the run. It can arrive two ways:
@@ -199,7 +252,8 @@ operations from there.
      action in one shot, for example: "Go to run train -> verify -> eval ->
      grade -> aggregate -> upload -> plot at `<SHA>`, with the upper-bound GPU
      estimate above, possible paid grader calls, HF writes to `<destinations>`,
-     and final PR/push included?"
+     and final PR/push included?" For a bundle, name every recipe and dependency
+     stage in that one question.
    Either way, once authorized run the entire pipeline end to end without any
    further confirmation prompts. Do not re-ask before grade, upload, pin, plot,
    or the final PR — they are all inside this one authorization.
@@ -225,6 +279,8 @@ operations from there.
    serialized execution. If any Modal job fails, stop and report — do not
    silently continue to later steps. The runner waits for sibling train actions
    to finish collecting logs, then raises before verification.
+   For a bundle, execute one recipe group at a time: run all producer train
+   jobs, verify their HF outputs, then proceed to the next dependent recipe.
 3. After training, run the in-config HF verification:
    ```
    PYTHONPATH=src uv run python tools/run_aft_recipe.py <config> --execute --git-ref <SHA> --step verify
@@ -255,12 +311,23 @@ authorization. Stop only on failure, or if a step would exceed the scope the
 user actually authorized:
 
 - `--step eval` — paid Modal generation, covered by launch authorization when
-  it was previewed and approved.
-- `--step grade` — local grading chunks. Paid grader/LLM behavior must be
-  surfaced in the Phase 1 preview, so it is already inside the launch
-  authorization; proceed without re-asking. Stop only if grading would call a
-  paid grader the preview did not disclose (that is preview drift, not a routine
-  gate).
+  it was previewed and approved. When the recipe selects more than one eval
+  job, run them with the runner's default parallel fan-out and write per-action
+  logs with `--log-dir`; add `--eval-concurrency N` only when the preview
+  bounded it, and `--serial-eval` only when the user explicitly chose serial
+  evals.
+- `--step grade` — the runner's grade step writes local grading chunks; the
+  paid API judge then grades those chunks. Run the judge with this skill's
+  default: the **Anthropic Haiku** judge
+  (`--judge-provider anthropic --judge-model claude-haiku-4-5-20251001`) at
+  parallel `--concurrency` (e.g. `64`), **not** the code-default OpenAI
+  `gpt-5.4-mini` at the low default concurrency — that keeps verdicts
+  consistent with the project's Haiku-judged results and plot labels. Paid
+  grader/LLM behavior was surfaced in the Phase 1 preview, so it is already
+  inside the launch authorization; proceed without re-asking. Stop only if
+  grading would call a paid grader the preview did not disclose, or if the user
+  asked for a different judge than the previewed one (that is preview drift,
+  not a routine gate).
 - `--step aggregate` — local aggregation.
 - `--step upload` — **irreversible**: pushes eval results to HF under the
   recipe's `source_key`s. The Phase 1 preview names these destination
@@ -327,10 +394,19 @@ removed. Link the Modal app URL(s) from the run output.
   authorization to *consider* running, not to spend. Once the launch
   authorization covers a paid/irreversible stage, do not ask again before that
   stage.
+- If a PR changes both `configs/msm_run/*.json` and `configs/aft_runs/*.json`,
+  treat it as a potential bundle; never auto-select only the AFT recipe without
+  proving the source adapters already exist.
 - Stop and ask for updated authorization if the command set, git SHA, GPU
-  type/count, timeout, estimated paid scope, grader behavior, HF destination,
-  upload source key, final PR/push scope, or budget boundary differs from what
-  the user approved.
+  type/count, timeout, estimated paid scope, grader behavior, judge
+  provider/model, HF destination, upload source key, final PR/push scope, or
+  budget boundary differs from what the user approved.
+- Default the LLM judge to Anthropic Haiku
+  (`--judge-provider anthropic --judge-model claude-haiku-4-5-20251001`) at
+  parallel `--concurrency`, never the code-default OpenAI `gpt-5.4-mini` serial
+  path, unless the user explicitly requests a different judge. Default `eval`
+  and `train` fan-out to the runner's parallel execution; reach for
+  `--serial-eval`/`--serial-train` only on explicit user request.
 - Always run against a concrete resolved SHA, defaulting to the merged `main`
   commit. Warn loudly if running against an unmerged branch.
 - Never merge or close PRs. If the PR isn't merged and the user wants the clean
