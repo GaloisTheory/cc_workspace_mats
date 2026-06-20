@@ -36,6 +36,11 @@ bound the respective fan-out, `--log-dir <dir>` to capture per-action logs
 when the user explicitly wants serialized execution. Eval fan-out is parallel
 by default — do not run eval jobs one `--job` at a time unless the user asks
 for serialized evals.
+For bundles, parallelism is a property of the dependency graph, not just of one
+recipe file: identify dependency **waves**, then fan out every ready recipe/job
+in the current wave when the user has not set a budget cap. Do not serialize
+independent raw producers, independent downstream AFT consumers, or independent
+eval recipes merely because they live in separate config files.
 
 The LLM judge that grades generations defaults in code to the OpenAI judge
 (`llm_judge_generation.DEFAULT_PROVIDER = "openai"`,
@@ -63,9 +68,11 @@ previewed).
 Recipe bundles are first-class. A PR may include a raw MSM producer recipe in
 `configs/msm_run/*.json` and a downstream AFT consumer recipe in
 `configs/aft_runs/*.json`. Treat that as one dependency-ordered execution plan:
-train and verify producer recipes first, then launch dependent AFT train/eval
-stages only after the source adapters exist. Never auto-select only the AFT
-recipe when the same PR also changes a likely producer recipe.
+train and verify producer dependency waves first, then launch dependent AFT
+train/eval waves only after their source adapters exist. Within a wave, run all
+independent recipes/jobs concurrently by default and report the maximum
+concurrent Modal jobs/GPUs in the launch preview. Never auto-select only the
+AFT recipe when the same PR also changes a likely producer recipe.
 
 Goal-backed runs: if the user explicitly asks to run this as a Codex goal,
 create a goal after launch authorization with an objective such as "Run
@@ -235,6 +242,11 @@ operations from there.
      `--eval-concurrency N` bound. Omit `--eval-concurrency` to fan out all
      selected eval actions; only use `--serial-eval` if the user asked for
      serialized evals,
+   - for bundles, a dependency-wave parallelism plan: which recipes/jobs can run
+     together, which must wait on producer HF verification, the maximum
+     concurrent Modal job count, and the maximum concurrent GPU count. If that
+     fan-out is more aggressive than prior project runs, call it out clearly so
+     the single "go" authorizes the higher instantaneous spend,
    - eval upload destinations: each `source_key`, resolved HF dataset path,
      and whether its revision is already pinned or still `PIN_AFTER_UPLOAD`,
    - plot keys and output directories,
@@ -279,8 +291,12 @@ operations from there.
    serialized execution. If any Modal job fails, stop and report — do not
    silently continue to later steps. The runner waits for sibling train actions
    to finish collecting logs, then raises before verification.
-   For a bundle, execute one recipe group at a time: run all producer train
-   jobs, verify their HF outputs, then proceed to the next dependent recipe.
+   For a bundle, execute by dependency wave, not by file order alone: start all
+   ready producer recipes/jobs concurrently when they have no source dependency
+   on each other, using distinct manifests/log dirs. After the entire wave
+   completes, run verification for every produced HF output in that wave, then
+   proceed to the next dependent wave. If the preview or user budget set a hard
+   concurrency cap, respect that cap; otherwise prefer full wave fan-out.
 3. After training, run the in-config HF verification:
    ```
    PYTHONPATH=src uv run python tools/run_aft_recipe.py <config> --execute --git-ref <SHA> --step verify
@@ -315,7 +331,10 @@ user actually authorized:
   job, run them with the runner's default parallel fan-out and write per-action
   logs with `--log-dir`; add `--eval-concurrency N` only when the preview
   bounded it, and `--serial-eval` only when the user explicitly chose serial
-  evals.
+  evals. For bundles, launch all eval recipes whose training dependencies have
+  verified in the same dependency wave concurrently by default, with separate
+  manifests/log dirs; avoid recipe-by-recipe eval serialization unless a budget,
+  quota, or explicit user request requires it.
 - `--step grade` — the runner's grade step writes local grading chunks; the
   paid API judge then grades those chunks. Run the judge with this skill's
   default: the **Anthropic Haiku** judge
@@ -334,7 +353,10 @@ user actually authorized:
   repo/source keys, so the launch authorization already covers them — proceed
   without another gate. Capture the commit SHA printed by
   `tools/upload_hf_folder.py` for each source key. Stop only if a resolved
-  destination differs from what the preview showed.
+  destination differs from what the preview showed. After upload, verify each
+  uploaded eval folder on HF has the required artifacts
+  (`generations.jsonl`, `manifest.json`, `lora_eval_rates.csv`, and `grading/`)
+  before treating local bulky result directories as disposable.
 - Pin uploaded eval sources. After upload, update
   `configs/eval_results_sources.json`, replacing each uploaded source's
   `PIN_AFTER_UPLOAD` with the concrete dataset commit SHA printed by the upload
@@ -372,7 +394,9 @@ expected artifacts) — that is the objective guardrail, not a routine gate.
 2. Include only intentional artifacts: usually `configs/eval_results_sources.json`
    revision pins, `tools/eval_results_plotting.py` changes, generated figures
    that repo conventions already track, and relevant manifests. Do not commit
-   bulky raw eval result directories unless the user explicitly asks.
+   bulky raw eval result directories unless the user explicitly asks; when you
+   leave them untracked, say plainly that "untracked" means "not committed to
+   Git", not "not uploaded", and cite the HF upload verification.
 3. Commit with the repo's co-author trailer convention, push, and open a PR.
    The PR body should summarize the executed SHA, Modal steps, HF upload
    destinations + pinned revisions, plot keys, and output figure paths.
