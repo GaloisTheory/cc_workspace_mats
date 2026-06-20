@@ -126,6 +126,14 @@ First agree on:
     `distributed_backend: "none"`).
   - If eval jobs are included, ask whether they should use the same GPU string;
     default to the same value unless the user chooses otherwise.
+- Fan-out budget across jobs. For recipes or bundles with multiple independent
+  training/eval jobs, ask how aggressively `/run-lora-execute` should parallelize
+  them. Default proposal: fan out every dependency-ready train/eval job in the
+  current wave, subject only to the user's explicit budget/quota cap. Distinguish
+  this from DDP: DDP is multiple GPUs inside one job, while fan-out is multiple
+  independent Modal jobs at once. Record any desired `--train-concurrency N` or
+  `--eval-concurrency N` cap in the PR body; if the user does not set one, say
+  the execute skill should run all independent jobs in the wave concurrently.
 - Data format & training objective. Ask which `dataset_format` the run uses:
   - `chat_sft` (default): rows carry `messages`; loss is over **assistant tokens
     + EOS** only; the tokenizer's chat template is required. Collect no extra
@@ -258,6 +266,12 @@ Write the recipe file(s): `configs/aft_runs/<name>.json`,
   Include checkpoint aliases explicitly; for example an epoch-2 checkpoint
   variant must point at the raw recipe's `msm_raw/epoch_02` output, not the final
   adapter root.
+- Shape bundles to expose safe parallelism. Independent producers should either
+  live in the same recipe or be documented as the same dependency wave; do not
+  split all/bands or seed-sweep jobs into an apparently sequential recipe order
+  unless a real source dependency requires it. Likewise, group downstream AFT
+  consumers and eval jobs by dependency wave so `/run-lora-execute` can launch
+  all ready work concurrently after the producing wave verifies.
 
 ## Phase 3: Validate + dry-run (no spend)
 
@@ -323,8 +337,11 @@ Write the recipe file(s): `configs/aft_runs/<name>.json`,
    `source_key`s/HF paths, and that `push_hf` is on/off. If the recipe defines
    more than one training job, say that `/run-lora-execute` will run them in
    parallel by default with per-action logs unless the user chooses
-   `--serial-train` or a bounded `--train-concurrency N`. For bundles, include
-   the recipe execution order and producer -> consumer adapter dependency map.
+   `--serial-train` or a bounded `--train-concurrency N`; say the same for evals
+   and `--eval-concurrency N`. For bundles, include the dependency-wave plan:
+   which producer/consumer recipes can run concurrently, which wait for HF
+   verification, and the maximum concurrent Modal jobs/GPUs implied by the
+   default fan-out.
    **Get the user's explicit OK on the plan before opening the PR.**
 
 ## Phase 4: Branch + PR (stop here)
@@ -338,9 +355,11 @@ Write the recipe file(s): `configs/aft_runs/<name>.json`,
 3. Open a PR with `gh pr create`. The PR body must include:
    - what the run does (dataset, lora_config, variants, seeds, epochs),
    - the agreed GPU type/count,
+   - the agreed train/eval fan-out plan or explicit concurrency caps,
    - the agreed HF adapter and eval upload layout,
    - for a bundle, the ordered recipe list and dependency map from raw MSM
-     outputs to downstream AFT `source_model_variants`,
+     outputs to downstream AFT `source_model_variants`, grouped into dependency
+     waves so reviewers can see what will run in parallel after merge,
    - the **dry-run command plan** from Phase 3 (so the reviewer sees the exact
      Modal commands),
    - a verification note (what the `verifications` block will check),
