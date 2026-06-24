@@ -7,6 +7,7 @@
 !.claude/skills/code-redteam/
 !.claude/skills/run-lora-training/
 !.claude/skills/run-lora-execute/
+!.claude/skills/plot-eval-results/
 
 # Secrets and environment files
 .secrets

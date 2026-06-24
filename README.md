@@ -34,6 +34,10 @@ The shared skills live in `.claude/skills/` and are loaded at session startup
   main SHA as `--git-ref`, preview the plan + rough cost, confirm before every
   paid step, run training + HF verification, then optionally the eval/plot
   pipeline. Targets the `midtraining_generalization` repo.
+- `plot-eval-results` - drive `tools/eval_results_plotting.py`: interview for the
+  wanted figure, classify it as regenerate / new-figure-of-an-existing-type /
+  new-shape, render it with the pinned-HF + byte-diff guardrails, and self-review
+  to improve the skill each use. Targets the `midtraining_generalization` repo.
 
 ### Codex sync
 
@@ -44,7 +48,7 @@ copy (this repo) and no drift. On a fresh machine, run:
 bash scripts/link-codex-skills.sh
 ```
 
-This points `~/.codex/skills/{vault-load,vault-capture,code-redteam,run-lora-training,run-lora-execute}`
+This points `~/.codex/skills/{vault-load,vault-capture,code-redteam,run-lora-training,run-lora-execute,plot-eval-results}`
 at the repo's `.claude/skills/` dirs (idempotent; backs up any existing real dirs).
 Restart Codex afterward to pick up the skills.
 
