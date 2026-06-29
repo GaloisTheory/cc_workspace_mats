@@ -7,7 +7,7 @@ defaults. It should stay lightweight and project-agnostic.
 
 - `.claude/commands/` contains public slash command prompts.
 - `.claude/skills/` contains shared skills (the vault pair, code-redteam, the
-  run-lora-training/run-lora-execute pair, and plot-eval-results);
+  run-lora-training/run-lora-execute pair, plot-eval-results, and data-analyst);
   these load at session startup, so restart a session to pick up newly added
   skills.
 - `.claude/settings.json` contains sanitized shared defaults only.
@@ -43,16 +43,22 @@ environments, caches, or secrets to this repo.
   wanted figure, classify regenerate / new-figure / new-shape, render with the
   pinned-HF + byte-diff guardrails, then self-review to improve the skill each
   use. Project-specific to `midtraining_generalization`.
+- `data-analyst` - the user's interactive "master data analyst": onboard from the
+  vault, then loop per figure (clarify target, locate + pin a cached HF dataset,
+  verify shapes/alignment, write or extend a percent-style `.py` notebook, render
+  PNG+SVG, send + numeric readout, propose the next cut). Open-ended sibling of
+  `plot-eval-results`. Project-specific to `midtraining_generalization`.
 
-The `run-lora-*` pair and `plot-eval-results` are an intentional exception to the
-"keep commands generic" rule below: they live here for cross-agent discoverability
-but target one repo, so they locate `projects/midtraining_generalization` at
-runtime rather than assuming the cwd. `code-redteam` is a milder case of the same
-exception — it reviews any file, but defaults its report output into that repo's
-gitignored `redteam/` folder, locating the repo the same runtime way.
+The `run-lora-*` pair, `plot-eval-results`, and `data-analyst` are an intentional
+exception to the "keep commands generic" rule below: they live here for cross-agent
+discoverability but target one repo, so they locate
+`projects/midtraining_generalization` at runtime rather than assuming the cwd.
+`code-redteam` is a milder case of the same exception — it reviews any file, but
+defaults its report output into that repo's gitignored `redteam/` folder, locating
+the repo the same runtime way.
 
 These skills are the single canonical copy. Codex consumes them via symlink
-(`~/.codex/skills/{vault-load,vault-capture,code-redteam,run-lora-training,run-lora-execute,plot-eval-results}` → `.claude/skills/...`), set up by
+(`~/.codex/skills/{vault-load,vault-capture,code-redteam,run-lora-training,run-lora-execute,plot-eval-results,data-analyst}` → `.claude/skills/...`), set up by
 `scripts/link-codex-skills.sh` — so edit the skill once here and both agents see
 it. Keep the `agent`/`last_agent` template fields runtime-neutral so the shared
 files read correctly for either agent.

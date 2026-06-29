@@ -10,7 +10,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC="$REPO_ROOT/.claude/skills"
 CODEX_SKILLS="${CODEX_SKILLS:-$HOME/.codex/skills}"
-SKILLS=(vault-load vault-capture code-redteam run-lora-training run-lora-execute plot-eval-results)
+SKILLS=(vault-load vault-capture code-redteam run-lora-training run-lora-execute plot-eval-results data-analyst)
 
 mkdir -p "$CODEX_SKILLS"
 backup=""

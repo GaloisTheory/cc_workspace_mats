@@ -8,6 +8,7 @@
 !.claude/skills/run-lora-training/
 !.claude/skills/run-lora-execute/
 !.claude/skills/plot-eval-results/
+!.claude/skills/data-analyst/
 
 # Secrets and environment files
 .secrets
