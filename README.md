@@ -38,6 +38,11 @@ The shared skills live in `.claude/skills/` and are loaded at session startup
   wanted figure, classify it as regenerate / new-figure-of-an-existing-type /
   new-shape, render it with the pinned-HF + byte-diff guardrails, and self-review
   to improve the skill each use. Targets the `midtraining_generalization` repo.
+- `plot-training-dynamics` - drive `tools/plot_training_dynamics.py`: render the
+  interactive HTML training-dynamics viewer (loss, per-step direction lock-in,
+  magnitude growth, cross-run geometry, gradient origin) from per-step LoRA traces
+  (local dir or pinned `hf:<repo>@<sha>/<subfolder>`); one run or two to diff.
+  Targets the `midtraining_generalization` repo.
 
 ### Codex sync
 
@@ -48,7 +53,7 @@ copy (this repo) and no drift. On a fresh machine, run:
 bash scripts/link-codex-skills.sh
 ```
 
-This points `~/.codex/skills/{vault-load,vault-capture,code-redteam,run-lora-training,run-lora-execute,plot-eval-results}`
+This points `~/.codex/skills/{vault-load,vault-capture,code-redteam,run-lora-training,run-lora-execute,plot-eval-results,plot-training-dynamics}`
 at the repo's `.claude/skills/` dirs (idempotent; backs up any existing real dirs).
 Restart Codex afterward to pick up the skills.
 

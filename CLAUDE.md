@@ -7,9 +7,9 @@ defaults. It should stay lightweight and project-agnostic.
 
 - `.claude/commands/` contains public slash command prompts.
 - `.claude/skills/` contains shared skills (the vault pair, code-redteam, the
-  run-lora-training/run-lora-execute pair, and plot-eval-results);
-  these load at session startup, so restart a session to pick up newly added
-  skills.
+  run-lora-training/run-lora-execute pair, plot-eval-results, and
+  plot-training-dynamics); these load at session startup, so restart a session
+  to pick up newly added skills.
 - `.claude/settings.json` contains sanitized shared defaults only.
 - `projects/` is a local-only container for cloned repositories.
 - `skills/` is reserved for optional local skills and keeps only `.gitkeep`
@@ -43,16 +43,21 @@ environments, caches, or secrets to this repo.
   wanted figure, classify regenerate / new-figure / new-shape, render with the
   pinned-HF + byte-diff guardrails, then self-review to improve the skill each
   use. Project-specific to `midtraining_generalization`.
+- `plot-training-dynamics` - drive `tools/plot_training_dynamics.py`: render the
+  interactive HTML training-dynamics viewer (loss, per-step direction lock-in,
+  magnitude growth, cross-run geometry, gradient origin) from per-step LoRA
+  traces (local dir or pinned `hf:<repo>@<sha>/<subfolder>`), one run or two to
+  diff. Project-specific to `midtraining_generalization`.
 
-The `run-lora-*` pair and `plot-eval-results` are an intentional exception to the
-"keep commands generic" rule below: they live here for cross-agent discoverability
-but target one repo, so they locate `projects/midtraining_generalization` at
-runtime rather than assuming the cwd. `code-redteam` is a milder case of the same
+The `run-lora-*` pair, `plot-eval-results`, and `plot-training-dynamics` are an
+intentional exception to the "keep commands generic" rule below: they live here
+for cross-agent discoverability but target one repo, so they locate
+`projects/midtraining_generalization` at runtime rather than assuming the cwd. `code-redteam` is a milder case of the same
 exception — it reviews any file, but defaults its report output into that repo's
 gitignored `redteam/` folder, locating the repo the same runtime way.
 
 These skills are the single canonical copy. Codex consumes them via symlink
-(`~/.codex/skills/{vault-load,vault-capture,code-redteam,run-lora-training,run-lora-execute,plot-eval-results}` → `.claude/skills/...`), set up by
+(`~/.codex/skills/{vault-load,vault-capture,code-redteam,run-lora-training,run-lora-execute,plot-eval-results,plot-training-dynamics}` → `.claude/skills/...`), set up by
 `scripts/link-codex-skills.sh` — so edit the skill once here and both agents see
 it. Keep the `agent`/`last_agent` template fields runtime-neutral so the shared
 files read correctly for either agent.
