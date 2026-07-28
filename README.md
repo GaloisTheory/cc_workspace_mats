@@ -11,7 +11,6 @@ their own repositories.
 
 The public slash commands live in `.claude/commands/`:
 
-- `/code-deepdive` - produce a line-level engineering analysis of a code file
 - `/code-learn` - work through a coding task with deliberate learning gaps
 - `/pyenv-setup` - initialize a Python project environment with `uv`
 - `/read-paper` - download and summarize an arxiv paper from source
@@ -22,6 +21,11 @@ The public slash commands live in `.claude/commands/`:
 The shared skills live in `.claude/skills/` and are loaded at session startup
 (restart your session to pick up newly added skills):
 
+- `code-deepdive` - explanatory line-level analysis of a code file: data flow by
+  stage, exhaustive silent-choice inventory, edge cases, key-lines table, written
+  out as a self-contained HTML onboarding document, served on localhost so you
+  get a clickable link. The sibling of `code-redteam` - this one teaches the code
+  rather than attacking it
 - `code-redteam` - adversarial red-team review of a code file (research-validity
   focus): severity-ranked findings, exhaustive parameter/silent-choice inventory,
   markdown report with executive summary
@@ -44,7 +48,7 @@ copy (this repo) and no drift. On a fresh machine, run:
 bash scripts/link-codex-skills.sh
 ```
 
-This points `~/.codex/skills/{vault-load,vault-capture,code-redteam,run-lora-training,run-lora-execute}`
+This points `~/.codex/skills/{vault-load,vault-capture,code-redteam,code-deepdive,run-lora-training,run-lora-execute}`
 at the repo's `.claude/skills/` dirs (idempotent; backs up any existing real dirs).
 Restart Codex afterward to pick up the skills.
 
