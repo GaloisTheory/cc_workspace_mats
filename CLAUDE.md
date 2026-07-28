@@ -6,10 +6,10 @@ defaults. It should stay lightweight and project-agnostic.
 ## Repository Shape
 
 - `.claude/commands/` contains public slash command prompts.
-- `.claude/skills/` contains shared skills (the vault pair, code-redteam, and
-  the run-lora-training/run-lora-execute pair);
-  these load at session startup, so restart a session to pick up newly added
-  skills.
+- `.claude/skills/` contains shared skills (the vault pair, the
+  code-deepdive/code-redteam pair, and the run-lora-training/run-lora-execute
+  pair); these load at session startup, so restart a session to pick up newly
+  added skills.
 - `.claude/settings.json` contains sanitized shared defaults only.
 - `projects/` is a local-only container for cloned repositories.
 - `skills/` is reserved for optional local skills and keeps only `.gitkeep`
@@ -20,7 +20,6 @@ environments, caches, or secrets to this repo.
 
 ## Public Commands
 
-- `/code-deepdive` - line-level analysis of a script or module.
 - `/code-learn` - scaffolded coding for deliberate practice.
 - `/pyenv-setup` - Python environment setup with `uv`.
 - `/read-paper` - arxiv source download and paper summary.
@@ -28,6 +27,12 @@ environments, caches, or secrets to this repo.
 
 ## Public Skills
 
+- `code-deepdive` - explanatory line-level analysis of a script or module: data
+  flow by stage, silent-choice inventory, edge cases, key-lines table, saved as
+  a self-contained HTML onboarding doc next to the target and served on
+  localhost so the user gets a clickable link (Artifact / `SendUserFile`
+  fallback when the browser can't reach this host). Sibling of `code-redteam`;
+  teaches the code rather than attacking it.
 - `code-redteam` - adversarial red-team review of a code file: research-validity
   findings ranked by severity, parameter/silent-choice inventory, MD report.
   Reviews any file, but defaults its report output to the gitignored
@@ -48,7 +53,7 @@ reviews any file, but defaults its report output into that repo's gitignored
 `redteam/` folder, locating the repo the same runtime way.
 
 These skills are the single canonical copy. Codex consumes them via symlink
-(`~/.codex/skills/{vault-load,vault-capture,code-redteam,run-lora-training,run-lora-execute}` → `.claude/skills/...`), set up by
+(`~/.codex/skills/{vault-load,vault-capture,code-redteam,code-deepdive,run-lora-training,run-lora-execute}` → `.claude/skills/...`), set up by
 `scripts/link-codex-skills.sh` — so edit the skill once here and both agents see
 it. Keep the `agent`/`last_agent` template fields runtime-neutral so the shared
 files read correctly for either agent.
